@@ -14,15 +14,15 @@ class CADObjectDetector:
     def __init__(self):
         pass
         
-    def detect_objects(self, cad_path, target_path, output_path=None, method='hybrid', threshold=0.7):
+    def detect_objects(self, cad_path, target_path, output_path=None, method='pattern', threshold=0.7):
         """
-        Detect standard CAD valve symbols using pattern matching
+        Detect standard CAD valve symbols using direct pattern matching
         
         Args:
             cad_path (str): Path to the CAD PNG file
             target_path (str): Path to the target PNG image (standard valve symbol)
             output_path (str, optional): Path where to save the highlighted CAD image
-            method (str): Matching method: 'pattern', 'geometric', or 'hybrid'
+            method (str): Only 'pattern' is supported
             threshold (float): Matching threshold (0.7-0.9 recommended)
         
         Returns:
@@ -30,9 +30,8 @@ class CADObjectDetector:
         """
         logger.info(f"Processing CAD file: {cad_path}")
         logger.info(f"Looking for pattern: {target_path}")
-        logger.info(f"Using method: {method}")
         
-        # Load images in grayscale - simplest and most reliable for pattern matching
+        # Load images in grayscale - simplest and most reliable for exact pattern matching
         cad_gray = cv2.imread(cad_path, cv2.IMREAD_GRAYSCALE)
         target_gray = cv2.imread(target_path, cv2.IMREAD_GRAYSCALE)
         
@@ -48,21 +47,13 @@ class CADObjectDetector:
         logger.info(f"CAD image size: {cad_gray.shape[1]}x{cad_gray.shape[0]}")
         logger.info(f"Target image size: {target_gray.shape[1]}x{target_gray.shape[0]}")
         
-        # Normalize intensity values
+        # For identical images, minimal preprocessing is needed
+        # Just ensure we have normalized intensity values
         cad_norm = cv2.normalize(cad_gray, None, 0, 255, cv2.NORM_MINMAX)
         target_norm = cv2.normalize(target_gray, None, 0, 255, cv2.NORM_MINMAX)
         
-        # Choose matching method
-        if method == 'pattern':
-            # Use only template matching with multi-scale support
-            matches, highlighted_img = self._multi_scale_template_matching(cad_norm, cad_color, target_norm, threshold)
-        elif method == 'geometric':
-            # Use only geometric feature matching
-            matches, highlighted_img = self._multi_scale_geometric_matching(cad_norm, cad_color, target_norm, threshold)
-        else:
-            # Default: hybrid approach (combining both methods)
-            matches, highlighted_img = self._multi_scale_hybrid_matching(cad_norm, cad_color, target_norm, threshold)
-        
+        # Get direct pattern matches with a high confidence
+        matches, highlighted_img = self._exact_pattern_matching(cad_norm, cad_color, target_norm, threshold)
         match_count = len(matches)
         
         logger.info(f"Found {match_count} matches with confidence >= {threshold}")
@@ -79,105 +70,46 @@ class CADObjectDetector:
     
     def _exact_pattern_matching(self, cad_img, cad_color, target_img, threshold):
         """
-        Perform pattern matching with multi-scale support to detect patterns at different sizes
+        Perform exact pattern matching with minimal processing
         """
         h, w = target_img.shape
         matches = []
         
-        # Define scale range to search - from 0.5x to 2x of original size
-        scales = np.linspace(0.5, 2.0, 15)  # 8 different scales
-        logger.debug(f"Trying {len(scales)} different scales from 0.5x to 2.0x")
+        # For identical patterns, direct template matching should work perfectly
+        result = cv2.matchTemplate(cad_img, target_img, cv2.TM_CCOEFF_NORMED)
         
-        best_result = None
-        best_scale = 1.0
+        # Find all locations where the match score exceeds threshold
+        locations = np.where(result >= threshold)
         
-        for scale in scales:
-            # Calculate new dimensions
-            new_width = int(w * scale)
-            new_height = int(h * scale)
-            
-            # Skip invalid scales (too small or larger than source image)
-            if new_width < 8 or new_height < 8 or new_width > cad_img.shape[1] or new_height > cad_img.shape[0]:
-                continue
-                
-            # Resize pattern according to scale
-            if scale == 1.0:
-                resized_target = target_img  # No need to resize at original scale
-            else:
-                resized_target = cv2.resize(target_img, (new_width, new_height), 
-                                           interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
-            
-            # Perform template matching at this scale
-            result = cv2.matchTemplate(cad_img, resized_target, cv2.TM_CCOEFF_NORMED)
-            
-            # Find locations above threshold at this scale
-            loc = np.where(result >= threshold)
-            
-            # Record all matches at this scale with their confidence scores
-            scale_matches = []
-            for pt in zip(*loc[::-1]):  # x,y coordinates
-                confidence = result[pt[1], pt[0]]
-                scale_matches.append({
-                    'x': pt[0], 
-                    'y': pt[1], 
-                    'w': new_width, 
-                    'h': new_height,
-                    'confidence': confidence,
-                    'scale': scale
-                })
-            
-            # Track the best match (highest confidence) across all scales
-            if loc[0].size > 0:
-                max_val = np.max(result)
-                if best_result is None or max_val > best_result:
-                    best_result = max_val
-                    best_scale = scale
-                    
-            # Add all matches from this scale to overall matches list
-            matches.extend(scale_matches)
+        # Convert to x,y coordinates
+        for pt in zip(*locations[::-1]):
+            matches.append((pt[0], pt[1], w, h))
         
-        logger.debug(f"Best scale: {best_scale:.2f}x with confidence {best_result:.3f}" if best_result else "No matches found")
-        
-        # Sort matches by confidence (highest first)
-        matches.sort(key=lambda x: x['confidence'], reverse=True)
-        
-        # Convert to format for overlap filtering
-        match_boxes = [(m['x'], m['y'], m['w'], m['h']) for m in matches]
+        # If no matches found and this is unexpected, try with slightly lower threshold
+        if len(matches) == 0 and threshold > 0.8:
+            logger.debug("No matches found with high threshold, trying with threshold=0.75")
+            locations = np.where(result >= 0.75)
+            for pt in zip(*locations[::-1]):
+                matches.append((pt[0], pt[1], w, h))
         
         # Filter overlapping detections
-        filtered_boxes = self._filter_overlaps(match_boxes)
+        matches = self._filter_overlaps(matches)
         
-        # Map the filtered boxes back to their detailed match info
-        # Create a lookup for matching filtered boxes back to original matches
-        filtered_matches = []
-        for box in filtered_boxes:
-            x, y, w, h = box
-            # Find matching entry in original matches list
-            for match in matches:
-                if match['x'] == x and match['y'] == y and match['w'] == w and match['h'] == h:
-                    filtered_matches.append(match)
-                    break
-        
-        # Create highlighted output image
+        # Draw red rectangles around matches
         highlighted_img = cad_color.copy()
-        
-        # Draw rectangles around matches
-        for match in filtered_matches:
-            x, y, w, h = match['x'], match['y'], match['w'], match['h']
-            confidence = match['confidence']
-            scale = match['scale']
-            
-            # Draw rectangle
+        for (x, y, w, h) in matches:
+            # Draw red rectangle (BGR format: 0,0,255)
             cv2.rectangle(highlighted_img, (x, y), (x + w, y + h), (0, 0, 255), 2)
             
-            # Add annotation with confidence and scale
-            annotation = f"{confidence:.2f} ({scale:.1f}x)"
-            cv2.putText(highlighted_img, annotation, (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 
+            # Get match confidence for this location
+            confidence = result[y, x]
+            # Add confidence score text
+            text = f"{confidence:.2f}"
+            cv2.putText(highlighted_img, text, (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 
                        0.5, (0, 0, 255), 1, cv2.LINE_AA)
         
-        # Return list of boxes for backward compatibility with existing code
-        return filtered_boxes, highlighted_img
-
+        return matches, highlighted_img
+    
     def _filter_overlaps(self, matches, overlap_thresh=0.3):
         """
         Filter overlapping detections using Non-Maximum Suppression

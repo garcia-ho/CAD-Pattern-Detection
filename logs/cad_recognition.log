@@ -294,3 +294,32 @@
 2025-03-12 18:24:49,835 - INFO - Target image size: 904x875
 2025-03-12 18:24:49,836 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
 2025-03-12 18:24:49,836 - INFO - Processing complete!
+2025-03-12 18:30:11,131 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:30:11,131 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:30:11,131 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:30:11,131 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:30:11,131 - INFO - Method: hybrid
+2025-03-12 18:30:11,131 - INFO - Threshold: 0.7
+2025-03-12 18:30:11,131 - INFO - Sensitivity: medium
+2025-03-12 18:30:11,131 - ERROR - Error processing targetA.png with targetA.png: 'CADObjectDetector' object has no attribute 'detect_objects'
+2025-03-12 18:30:11,131 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute 'detect_objects'
+2025-03-12 18:30:11,132 - INFO - Processing complete!
+2025-03-12 18:32:34,666 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:32:34,666 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:32:34,666 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:32:34,666 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:32:34,666 - INFO - Method: hybrid
+2025-03-12 18:32:34,666 - INFO - Threshold: 0.7
+2025-03-12 18:32:34,666 - INFO - Sensitivity: medium
+2025-03-12 18:32:34,666 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:32:34,666 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:32:34,687 - INFO - CAD image size: 904x875
+2025-03-12 18:32:34,687 - INFO - Target image size: 904x875
+2025-03-12 18:32:34,706 - INFO - Found 1 matches with confidence >= 0.7
+2025-03-12 18:32:34,716 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/targetA_matched_targetA.png
+2025-03-12 18:32:34,716 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:32:34,716 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:32:34,722 - INFO - CAD image size: 135x88
+2025-03-12 18:32:34,722 - INFO - Target image size: 904x875
+2025-03-12 18:32:34,741 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 18:32:34,741 - INFO - Processing complete!
