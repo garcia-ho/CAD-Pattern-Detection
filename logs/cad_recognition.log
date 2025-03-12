@@ -1,0 +1,296 @@
+2025-03-12 15:46:44,513 - INFO - CAD Recognition Tool starting...
+2025-03-12 15:46:44,513 - INFO - CAD folder: /home/r27user6/cad_rcg/input_CAD
+2025-03-12 15:46:44,515 - INFO - Target folder: /home/r27user6/cad_rcg/input_target
+2025-03-12 15:46:44,515 - INFO - Output folder: /home/r27user6/cad_rcg/output_CAD
+2025-03-12 15:46:44,515 - INFO - Method: pattern
+2025-03-12 15:46:44,515 - INFO - Threshold: 0.7
+2025-03-12 15:46:44,515 - INFO - Sensitivity: medium
+2025-03-12 15:46:44,515 - INFO - Processing target: targetA
+2025-03-12 15:46:44,515 - INFO - Analyzing CAD file: testA
+2025-03-12 15:46:44,515 - INFO - Processing CAD file: /home/r27user6/cad_rcg/input_CAD/testA.PNG
+2025-03-12 15:46:44,515 - INFO - Looking for valve pattern: /home/r27user6/cad_rcg/input_target/targetA.png
+2025-03-12 15:46:44,751 - INFO - CAD image size: 971x612
+2025-03-12 15:46:44,751 - INFO - Target image size: 904x875
+2025-03-12 15:46:44,764 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,765 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,766 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,767 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,767 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,768 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,769 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,769 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,770 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,770 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,771 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,772 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:44,999 - INFO - Found 0 valve symbols in the CAD drawing
+2025-03-12 15:46:45,006 - INFO - Found 0 instances of targetA in testA
+2025-03-12 15:46:45,007 - INFO - Processing complete!
+2025-03-12 15:46:51,936 - INFO - CAD Recognition Tool starting...
+2025-03-12 15:46:51,936 - INFO - CAD folder: /home/r27user6/cad_rcg/input_CAD
+2025-03-12 15:46:51,936 - INFO - Target folder: /home/r27user6/cad_rcg/input_target
+2025-03-12 15:46:51,936 - INFO - Output folder: /home/r27user6/cad_rcg/output_CAD
+2025-03-12 15:46:51,936 - INFO - Method: pattern
+2025-03-12 15:46:51,936 - INFO - Threshold: 0.7
+2025-03-12 15:46:51,936 - INFO - Sensitivity: medium
+2025-03-12 15:46:51,936 - INFO - Processing target: targetA
+2025-03-12 15:46:51,936 - INFO - Analyzing CAD file: testA
+2025-03-12 15:46:51,936 - INFO - Processing CAD file: /home/r27user6/cad_rcg/input_CAD/testA.PNG
+2025-03-12 15:46:51,936 - INFO - Looking for valve pattern: /home/r27user6/cad_rcg/input_target/targetA.png
+2025-03-12 15:46:52,183 - INFO - CAD image size: 971x612
+2025-03-12 15:46:52,184 - INFO - Target image size: 904x875
+2025-03-12 15:46:52,203 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,204 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,205 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,205 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,206 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,206 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,207 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,207 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,207 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,208 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,209 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,210 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:46:52,329 - INFO - Found 0 valve symbols in the CAD drawing
+2025-03-12 15:46:52,329 - INFO - Found 0 instances of targetA in testA
+2025-03-12 15:46:52,329 - INFO - Processing complete!
+2025-03-12 15:51:37,955 - INFO - CAD Recognition Tool starting...
+2025-03-12 15:51:37,955 - INFO - CAD folder: /home/r27user6/cad_rcg/input_CAD
+2025-03-12 15:51:37,955 - INFO - Target folder: /home/r27user6/cad_rcg/input_target
+2025-03-12 15:51:37,955 - INFO - Output folder: /home/r27user6/cad_rcg/output_CAD
+2025-03-12 15:51:37,955 - INFO - Method: pattern
+2025-03-12 15:51:37,955 - INFO - Threshold: 0.7
+2025-03-12 15:51:37,955 - INFO - Sensitivity: medium
+2025-03-12 15:51:37,955 - INFO - Processing target: targetA
+2025-03-12 15:51:37,955 - INFO - Analyzing CAD file: testA
+2025-03-12 15:51:37,955 - INFO - Processing CAD file: /home/r27user6/cad_rcg/input_CAD/testA.PNG
+2025-03-12 15:51:37,955 - INFO - Looking for valve pattern: /home/r27user6/cad_rcg/input_target/targetA.png
+2025-03-12 15:51:38,202 - INFO - CAD image size: 971x612
+2025-03-12 15:51:38,202 - INFO - Target image size: 904x875
+2025-03-12 15:51:38,212 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,213 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,214 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,214 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,215 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,216 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,216 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,218 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,218 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,219 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,219 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,219 - WARNING - Error during pattern matching: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 15:51:38,339 - INFO - Found 0 valve symbols in the CAD drawing
+2025-03-12 15:51:38,339 - INFO - Found 0 instances of targetA in testA
+2025-03-12 15:51:38,339 - INFO - Analyzing CAD file: targetA
+2025-03-12 15:51:38,339 - INFO - Processing CAD file: /home/r27user6/cad_rcg/input_CAD/targetA.png
+2025-03-12 15:51:38,339 - INFO - Looking for valve pattern: /home/r27user6/cad_rcg/input_target/targetA.png
+2025-03-12 15:51:38,349 - INFO - CAD image size: 904x875
+2025-03-12 15:51:38,349 - INFO - Target image size: 904x875
+2025-03-12 15:51:38,565 - INFO - Found 0 valve symbols in the CAD drawing
+2025-03-12 15:51:38,565 - INFO - Found 0 instances of targetA in targetA
+2025-03-12 15:51:38,565 - INFO - Processing complete!
+2025-03-12 17:47:58,386 - INFO - CAD Recognition Tool starting...
+2025-03-12 17:47:58,386 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 17:47:58,386 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 17:47:58,386 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 17:47:58,386 - INFO - Method: pattern
+2025-03-12 17:47:58,386 - INFO - Threshold: 0.7
+2025-03-12 17:47:58,386 - INFO - Sensitivity: medium
+2025-03-12 17:47:58,386 - INFO - Processing target: targetA
+2025-03-12 17:47:58,386 - INFO - Analyzing CAD file: testA
+2025-03-12 17:47:58,386 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testA.PNG
+2025-03-12 17:47:58,387 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 17:47:58,404 - INFO - CAD image size: 971x612
+2025-03-12 17:47:58,404 - INFO - Target image size: 904x875
+2025-03-12 17:47:58,405 - ERROR - Error processing /home/r27user6/CAD_matching/input_CAD/testA.PNG with /home/r27user6/CAD_matching/input_target/targetA.png: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 17:47:58,405 - INFO - Analyzing CAD file: targetA
+2025-03-12 17:47:58,405 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 17:47:58,405 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 17:47:58,423 - INFO - CAD image size: 904x875
+2025-03-12 17:47:58,423 - INFO - Target image size: 904x875
+2025-03-12 17:47:58,439 - INFO - Found 1 matches with confidence >= 0.7
+2025-03-12 17:47:58,448 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/targetA_targetA_detected.png
+2025-03-12 17:47:58,448 - INFO - Found 1 instances of targetA in targetA
+2025-03-12 17:47:58,448 - INFO - Saved highlighted image at /home/r27user6/CAD_matching/output_CAD/targetA_targetA_detected.png
+2025-03-12 17:47:58,448 - INFO - Processing complete!
+2025-03-12 17:50:38,748 - INFO - CAD Recognition Tool starting...
+2025-03-12 17:50:38,748 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 17:50:38,748 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 17:50:38,748 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 17:50:38,748 - INFO - Method: pattern
+2025-03-12 17:50:38,748 - INFO - Threshold: 0.7
+2025-03-12 17:50:38,748 - INFO - Sensitivity: medium
+2025-03-12 17:50:38,748 - INFO - Processing target: targetA
+2025-03-12 17:50:38,748 - INFO - Analyzing CAD file: testA
+2025-03-12 17:50:38,748 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testA.PNG
+2025-03-12 17:50:38,748 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 17:50:38,766 - INFO - CAD image size: 971x612
+2025-03-12 17:50:38,766 - INFO - Target image size: 904x875
+2025-03-12 17:50:38,767 - ERROR - Error processing /home/r27user6/CAD_matching/input_CAD/testA.PNG with /home/r27user6/CAD_matching/input_target/targetA.png: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 17:50:38,767 - INFO - Analyzing CAD file: targetA
+2025-03-12 17:50:38,767 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 17:50:38,767 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 17:50:38,785 - INFO - CAD image size: 904x875
+2025-03-12 17:50:38,785 - INFO - Target image size: 904x875
+2025-03-12 17:50:38,803 - INFO - Found 1 matches with confidence >= 0.7
+2025-03-12 17:50:38,813 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/targetA_targetA_detected.png
+2025-03-12 17:50:38,814 - INFO - Found 1 instances of targetA in targetA
+2025-03-12 17:50:38,814 - INFO - Saved highlighted image at /home/r27user6/CAD_matching/output_CAD/targetA_targetA_detected.png
+2025-03-12 17:50:38,814 - INFO - Processing complete!
+2025-03-12 18:10:31,431 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:10:31,431 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:10:31,431 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:10:31,431 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:10:31,431 - INFO - Method: hybrid
+2025-03-12 18:10:31,431 - INFO - Threshold: 0.7
+2025-03-12 18:10:31,431 - INFO - Sensitivity: medium
+2025-03-12 18:10:31,431 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testA.PNG
+2025-03-12 18:10:31,431 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:10:31,448 - INFO - CAD image size: 971x612
+2025-03-12 18:10:31,448 - INFO - Target image size: 904x875
+2025-03-12 18:10:31,449 - ERROR - Error processing testA.PNG with targetA.png: OpenCV(4.10.0) /croot/opencv-suite_1738943342777/work/modules/imgproc/src/templmatch.cpp:1175: error: (-215:Assertion failed) _img.size().height <= _templ.size().height && _img.size().width <= _templ.size().width in function 'matchTemplate'
+
+2025-03-12 18:10:31,449 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:10:31,449 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:10:31,466 - INFO - CAD image size: 904x875
+2025-03-12 18:10:31,466 - INFO - Target image size: 904x875
+2025-03-12 18:10:31,482 - INFO - Found 1 matches with confidence >= 0.7
+2025-03-12 18:10:31,490 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/targetA_matched_targetA.png
+2025-03-12 18:10:31,490 - INFO - Processing complete!
+2025-03-12 18:12:09,166 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:12:09,167 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:12:09,167 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:12:09,167 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:12:09,167 - INFO - Method: geometric
+2025-03-12 18:12:09,167 - INFO - Threshold: 0.7
+2025-03-12 18:12:09,167 - INFO - Sensitivity: medium
+2025-03-12 18:12:09,168 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:12:09,168 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:12:09,187 - INFO - CAD image size: 904x875
+2025-03-12 18:12:09,187 - INFO - Target image size: 904x875
+2025-03-12 18:12:09,204 - INFO - Found 1 matches with confidence >= 0.7
+2025-03-12 18:12:09,212 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/targetA_matched_targetA.png
+2025-03-12 18:12:09,212 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:12:09,212 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:12:09,218 - INFO - CAD image size: 135x88
+2025-03-12 18:12:09,218 - INFO - Target image size: 904x875
+2025-03-12 18:12:09,236 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 18:12:09,237 - INFO - Processing complete!
+2025-03-12 18:23:08,597 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:23:08,597 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:23:08,597 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:23:08,597 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:23:08,597 - INFO - Method: geometric
+2025-03-12 18:23:08,598 - INFO - Threshold: 0.7
+2025-03-12 18:23:08,598 - INFO - Sensitivity: medium
+2025-03-12 18:23:08,598 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:23:08,598 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:23:08,598 - INFO - Using method: geometric
+2025-03-12 18:23:08,617 - INFO - CAD image size: 904x875
+2025-03-12 18:23:08,617 - INFO - Target image size: 904x875
+2025-03-12 18:23:08,618 - ERROR - Error processing targetA.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_geometric_matching'
+2025-03-12 18:23:08,618 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:23:08,618 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:23:08,618 - INFO - Using method: geometric
+2025-03-12 18:23:08,624 - INFO - CAD image size: 135x88
+2025-03-12 18:23:08,624 - INFO - Target image size: 904x875
+2025-03-12 18:23:08,624 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_geometric_matching'
+2025-03-12 18:23:08,624 - INFO - Processing complete!
+2025-03-12 18:23:26,511 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:23:26,511 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:23:26,511 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:23:26,511 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:23:26,511 - INFO - Method: hybrid
+2025-03-12 18:23:26,511 - INFO - Threshold: 0.7
+2025-03-12 18:23:26,511 - INFO - Sensitivity: medium
+2025-03-12 18:23:26,511 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:23:26,511 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:23:26,511 - INFO - Using method: hybrid
+2025-03-12 18:23:26,529 - INFO - CAD image size: 904x875
+2025-03-12 18:23:26,529 - INFO - Target image size: 904x875
+2025-03-12 18:23:26,529 - ERROR - Error processing targetA.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:23:26,530 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:23:26,530 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:23:26,530 - INFO - Using method: hybrid
+2025-03-12 18:23:26,535 - INFO - CAD image size: 135x88
+2025-03-12 18:23:26,535 - INFO - Target image size: 904x875
+2025-03-12 18:23:26,536 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:23:26,536 - INFO - Processing complete!
+2025-03-12 18:24:36,754 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:24:36,754 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:24:36,756 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:24:36,756 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:24:36,756 - INFO - Method: hybrid
+2025-03-12 18:24:36,756 - INFO - Threshold: 0.7
+2025-03-12 18:24:36,756 - INFO - Sensitivity: medium
+2025-03-12 18:24:36,756 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:24:36,756 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:24:36,756 - INFO - Using method: hybrid
+2025-03-12 18:24:36,775 - INFO - CAD image size: 904x875
+2025-03-12 18:24:36,775 - INFO - Target image size: 904x875
+2025-03-12 18:24:36,776 - ERROR - Error processing targetA.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:24:36,776 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:24:36,776 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:24:36,776 - INFO - Using method: hybrid
+2025-03-12 18:24:36,782 - INFO - CAD image size: 135x88
+2025-03-12 18:24:36,782 - INFO - Target image size: 904x875
+2025-03-12 18:24:36,782 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:24:36,783 - INFO - Processing complete!
+2025-03-12 18:24:49,809 - INFO - CAD Recognition Tool starting...
+2025-03-12 18:24:49,809 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 18:24:49,809 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 18:24:49,809 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 18:24:49,809 - INFO - Method: hybrid
+2025-03-12 18:24:49,809 - INFO - Threshold: 0.7
+2025-03-12 18:24:49,809 - INFO - Sensitivity: medium
+2025-03-12 18:24:49,809 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/targetA.png
+2025-03-12 18:24:49,810 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:24:49,810 - INFO - Using method: hybrid
+2025-03-12 18:24:49,828 - INFO - CAD image size: 904x875
+2025-03-12 18:24:49,829 - INFO - Target image size: 904x875
+2025-03-12 18:24:49,829 - ERROR - Error processing targetA.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:24:49,830 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 18:24:49,830 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 18:24:49,830 - INFO - Using method: hybrid
+2025-03-12 18:24:49,835 - INFO - CAD image size: 135x88
+2025-03-12 18:24:49,835 - INFO - Target image size: 904x875
+2025-03-12 18:24:49,836 - ERROR - Error processing testB.png with targetA.png: 'CADObjectDetector' object has no attribute '_multi_scale_hybrid_matching'
+2025-03-12 18:24:49,836 - INFO - Processing complete!

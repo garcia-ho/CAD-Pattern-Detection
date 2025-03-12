@@ -1,4 +1,0 @@
-2025-03-11 22:43:49,902 - root - INFO - Starting CAD Object Detector application
-2025-03-11 22:46:01,596 - root - INFO - Starting CAD Object Detector in headless mode
-2025-03-11 22:46:01,597 - root - INFO - Loaded target image: target_A.jpg
-2025-03-11 22:46:08,641 - root - INFO - Saved highlighted PDF to output_CAD/I-BS-7204-SS-AC101-0-Water Side Schematic Diagram (Annex 1)_target_A_highlighted.pdf
