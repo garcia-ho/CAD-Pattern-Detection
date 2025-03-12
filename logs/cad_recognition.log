@@ -323,3 +323,79 @@
 2025-03-12 18:32:34,722 - INFO - Target image size: 904x875
 2025-03-12 18:32:34,741 - INFO - Found 0 matches with confidence >= 0.7
 2025-03-12 18:32:34,741 - INFO - Processing complete!
+2025-03-12 21:18:08,297 - INFO - CAD Recognition Tool starting...
+2025-03-12 21:18:08,297 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 21:18:08,297 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 21:18:08,297 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 21:18:08,297 - INFO - Method: hybrid
+2025-03-12 21:18:08,297 - INFO - Threshold: 0.7
+2025-03-12 21:18:08,297 - INFO - Sensitivity: medium
+2025-03-12 21:18:08,297 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 21:18:08,297 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:18:08,303 - INFO - CAD image size: 135x88
+2025-03-12 21:18:08,303 - INFO - Target image size: 904x875
+2025-03-12 21:18:08,324 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:18:08,324 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testC.png
+2025-03-12 21:18:08,324 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:18:08,350 - INFO - CAD image size: 1500x1000
+2025-03-12 21:18:08,350 - INFO - Target image size: 904x875
+2025-03-12 21:18:08,376 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:18:08,378 - INFO - Processing complete!
+2025-03-12 21:19:05,255 - INFO - CAD Recognition Tool starting...
+2025-03-12 21:19:05,255 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 21:19:05,255 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 21:19:05,255 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 21:19:05,255 - INFO - Method: pattern
+2025-03-12 21:19:05,255 - INFO - Threshold: 0.7
+2025-03-12 21:19:05,255 - INFO - Sensitivity: medium
+2025-03-12 21:19:05,255 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 21:19:05,255 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:19:05,262 - INFO - CAD image size: 135x88
+2025-03-12 21:19:05,262 - INFO - Target image size: 904x875
+2025-03-12 21:19:05,282 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:19:05,283 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testC.png
+2025-03-12 21:19:05,283 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:19:05,307 - INFO - CAD image size: 1500x1000
+2025-03-12 21:19:05,307 - INFO - Target image size: 904x875
+2025-03-12 21:19:05,332 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:19:05,333 - INFO - Processing complete!
+2025-03-12 21:29:27,676 - INFO - CAD Recognition Tool starting...
+2025-03-12 21:29:27,676 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 21:29:27,676 - INFO - Target folder: /home/r27user6/CAD_matching/input_target
+2025-03-12 21:29:27,676 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 21:29:27,677 - INFO - Method: hybrid
+2025-03-12 21:29:27,677 - INFO - Threshold: 0.7
+2025-03-12 21:29:27,677 - INFO - Sensitivity: medium
+2025-03-12 21:29:27,677 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 21:29:27,677 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:29:27,683 - INFO - CAD image size: 135x88
+2025-03-12 21:29:27,684 - INFO - Target image size: 904x875
+2025-03-12 21:29:27,703 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:29:27,703 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testC.png
+2025-03-12 21:29:27,703 - INFO - Looking for pattern: /home/r27user6/CAD_matching/input_target/targetA.png
+2025-03-12 21:29:27,727 - INFO - CAD image size: 1500x1000
+2025-03-12 21:29:27,728 - INFO - Target image size: 904x875
+2025-03-12 21:29:27,844 - INFO - Found 0 matches with confidence >= 0.7
+2025-03-12 21:29:27,845 - INFO - Processing complete!
+2025-03-12 21:40:46,808 - INFO - Created directory: /home/r27user6/CAD_matching/debug
+2025-03-12 21:40:46,812 - INFO - CAD Triangle Detection Tool starting...
+2025-03-12 21:40:46,812 - INFO - CAD folder: /home/r27user6/CAD_matching/input_CAD
+2025-03-12 21:40:46,812 - INFO - Output folder: /home/r27user6/CAD_matching/output_CAD
+2025-03-12 21:40:46,812 - INFO - Min triangle area: 100
+2025-03-12 21:40:46,812 - INFO - Max triangle area: 10000
+2025-03-12 21:40:46,812 - INFO - Approximation threshold: 0.01
+2025-03-12 21:40:46,812 - INFO - Processing CAD file: testB.png
+2025-03-12 21:40:46,812 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testB.png
+2025-03-12 21:40:46,812 - INFO - Looking for triangles
+2025-03-12 21:40:46,813 - INFO - CAD image size: 135x88
+2025-03-12 21:40:46,826 - INFO - Found 0 triangles
+2025-03-12 21:40:46,827 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/testB_triangles.png
+2025-03-12 21:40:46,827 - INFO - Found 0 triangles in testB.png
+2025-03-12 21:40:46,827 - INFO - Processing CAD file: testC.png
+2025-03-12 21:40:46,827 - INFO - Processing CAD file: /home/r27user6/CAD_matching/input_CAD/testC.png
+2025-03-12 21:40:46,827 - INFO - Looking for triangles
+2025-03-12 21:40:46,843 - INFO - CAD image size: 1500x1000
+2025-03-12 21:40:46,855 - INFO - Found 0 triangles
+2025-03-12 21:40:46,872 - INFO - Saved highlighted image to: /home/r27user6/CAD_matching/output_CAD/testC_triangles.png
+2025-03-12 21:40:46,873 - INFO - Found 0 triangles in testC.png
+2025-03-12 21:40:46,873 - INFO - Processing complete!
