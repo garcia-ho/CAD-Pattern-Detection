@@ -5,83 +5,6 @@ import multiprocessing
 from joblib import Parallel, delayed
 import concurrent.futures
 
-class TriangleDetector:
-    def __init__(self):
-        self.min_area = 100  # Minimum area of triangle to be detected
-        self.approx_epsilon_factor = 0.02  # Approximation accuracy
-
-    def detect_triangles(self, image):
-        """
-        Detect triangles in the given image.
-        
-        Args:
-            image: Input image (BGR)
-            
-        Returns:
-            List of triangles (each triangle is a numpy array of 3 points)
-        """
-        # Convert to grayscale
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Apply threshold or edge detection
-        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
-        
-        # Find contours
-        contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        
-        triangles = []
-        
-        # Iterate through each contour
-        for contour in contours:
-            # Filter small contours
-            if cv2.contourArea(contour) < self.min_area:
-                continue
-                
-            # Approximate contour with polygon
-            epsilon = self.approx_epsilon_factor * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            
-            # Check if it's a triangle (has 3 vertices)
-            if len(approx) == 3:
-                triangles.append(approx)
-                
-        return triangles
-
-    def fill_triangles(self, image, triangles, color=(0, 0, 255)):  # Red color (BGR)
-        """
-        Fill detected triangles with a specific color
-        
-        Args:
-            image: Input image
-            triangles: List of triangles
-            color: Color to fill triangles with (BGR format)
-            
-        Returns:
-            Image with filled triangles
-        """
-        # Create a copy of the image to avoid modifying the original
-        result = image.copy()
-        
-        # Draw filled triangles
-        cv2.fillPoly(result, triangles, color)
-        
-        return result
-
-    def draw_triangle_count(self, image, count):
-        """
-        Draw triangle count on the image
-        
-        Args:
-            image: Input image
-            count: Number of triangles detected
-            
-        Returns:
-            Image with text indicating triangle count
-        """
-        result = image.copy()
-        text = f"Triangles: {count}"
-        cv2.putText(result, text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-        return result
 
 class PatternDetector:
     def __init__(self, threshold=0.7, scale_range=(0.2, 2.0), scale_steps=20, rotations=None):
@@ -130,6 +53,7 @@ class PatternDetector:
         
         # Store all matches from different scales and rotations
         all_rectangles = []
+        scale_match_counts = {}
         
         # Try different rotations
         for angle in self.rotations:
@@ -166,13 +90,47 @@ class PatternDetector:
                 # Find locations where the matching exceeds our threshold
                 locations = np.where(result >= self.threshold)
                 
+                # Track matches per scale for anomaly detection
+                scale_key = f"{angle}_{scale:.3f}"
+                scale_match_counts[scale_key] = len(locations[0])
+                
                 # Convert to list of rectangles with rotation angle
                 for pt in zip(*locations[::-1]):  # Swap columns and rows
-                    all_rectangles.append((pt[0], pt[1], scaled_w, scaled_h, angle))
+                    all_rectangles.append((pt[0], pt[1], scaled_w, scaled_h, angle, scale))
                     
                 # Print status for large-scale operations
                 if len(locations[0]) > 0:
                     print(f"Found {len(locations[0])} matches at angle={angle}, scale={scale:.2f}")
+        
+        # Check for anomalies in match counts
+        if scale_match_counts:
+            avg_matches = sum(scale_match_counts.values()) / len(scale_match_counts)
+            max_matches = max(scale_match_counts.values())
+            
+            # If any scale has significantly more matches than average, it might be detecting noise
+            if max_matches > avg_matches * 5 and max_matches > 20:
+                print(f"WARNING: Detected possible false positives. Max matches: {max_matches}, Avg: {avg_matches:.2f}")
+                
+                # Find the problematic scales
+                problematic_scales = [k for k, v in scale_match_counts.items() if v > avg_matches * 3]
+                print(f"Problematic scales: {problematic_scales}")
+                
+                # Filter out rectangles from problematic scales if necessary
+                if max_matches > 100:  # If there's an extreme anomaly
+                    filtered_rectangles = []
+                    for rect in all_rectangles:
+                        x, y, w, h, angle, scale = rect
+                        scale_key = f"{angle}_{scale:.3f}"
+                        if scale_key not in problematic_scales:
+                            filtered_rectangles.append((x, y, w, h, angle))
+                    
+                    all_rectangles = filtered_rectangles
+                else:
+                    # Just remove the scale information
+                    all_rectangles = [(x, y, w, h, angle) for (x, y, w, h, angle, scale) in all_rectangles]
+            else:
+                # Remove the scale information
+                all_rectangles = [(x, y, w, h, angle) for (x, y, w, h, angle, scale) in all_rectangles]
         
         # Apply non-maximum suppression to avoid multiple detections of the same object
         filtered_rectangles = self._non_max_suppression(all_rectangles)
@@ -219,6 +177,19 @@ class PatternDetector:
             # Compute area of each box
             area = (x2 - x1) * (y2 - y1)
             
+            # Reject extremely small areas (likely false positives)
+            valid_indices = np.where(area > 100)[0]  # Minimum area threshold
+            if valid_indices.size == 0:
+                continue
+                
+            # Filter by area
+            x1 = x1[valid_indices]
+            y1 = y1[valid_indices]
+            x2 = x2[valid_indices]
+            y2 = y2[valid_indices]
+            area = area[valid_indices]
+            indices = [indices[i] for i in valid_indices]
+            
             # Sort boxes by area (larger first)
             order = np.argsort(area)[::-1]
             
@@ -231,7 +202,7 @@ class PatternDetector:
                 xx1 = np.maximum(x1[i], x1[order[1:]])
                 yy1 = np.maximum(y1[i], y1[order[1:]])
                 xx2 = np.minimum(x2[i], x2[order[1:]])
-                yy2 = np.minimum(y2[i], y2[order[1:]])  # Fixed: was using y1
+                yy2 = np.minimum(y2[i], y2[order[1:]])
                 
                 # Compute width and height of intersection
                 w = np.maximum(0, xx2 - xx1)
@@ -242,8 +213,13 @@ class PatternDetector:
                 union = area[i] + area[order[1:]] - intersection
                 iou = intersection / (union + 1e-6)
                 
+                # Higher overlap threshold for smaller objects
+                adaptive_threshold = overlap_threshold
+                if area[i] < 500:  # For small objects
+                    adaptive_threshold = 0.2  # Stricter threshold
+                
                 # Remove indices with IoU > threshold
-                inds = np.where(iou <= overlap_threshold)[0]
+                inds = np.where(iou <= adaptive_threshold)[0]
                 order = order[inds + 1]
                 
             # Map back to original indices
@@ -262,8 +238,7 @@ class PatternDetector:
             
             area = (x2 - x1) * (y2 - y1)
             
-            # This time use confidence as sorting key (could be template match score if available)
-            # For now, just use area as a proxy
+            # Sort by area again (larger first)
             order = np.argsort(area)[::-1]
             
             final_keep = []
@@ -290,8 +265,13 @@ class PatternDetector:
                 union = area[i] + area[order[1:]] - intersection
                 iou = intersection / (union + 1e-6)
                 
+                # Dynamic threshold based on area
+                adaptive_threshold = overlap_threshold
+                if area[i] < 500:
+                    adaptive_threshold = 0.2
+                
                 # Remove indices with IoU > threshold
-                inds = np.where(iou <= overlap_threshold)[0]
+                inds = np.where(iou <= adaptive_threshold)[0]
                 order = order[inds + 1]
                 
             # Return final filtered rectangles

@@ -2,11 +2,13 @@ import cv2
 import os
 import numpy as np
 import concurrent.futures
+import argparse
 from functools import partial
 from detector import PatternDetector
+from datetime import datetime
 
 # Define a parallel foreach function with dopar-like behavior
-def foreach_dopar(iterable, func, max_workers=4):
+def foreach_dopar(iterable, func, max_workers=6):
     """
     Execute a function on each item in parallel.
     Similar to R's foreach %dopar% functionality.
@@ -67,28 +69,81 @@ def process_image(image_name, template, detector, input_dir, output_dir):
     
     return image_name, len(matches)
 
-def main(detect_rotations=True):
+def generate_detection_report(results, output_file="detection_result.txt"):
     """
-    Main function to process images and detect patterns
+    Generate a text report of detection results
     
     Args:
-        detect_rotations: Whether to detect rotated patterns (defaults to True)
+        results: List of (image_name, match_count) tuples
+        output_file: Path where to save the report
+        
+    Returns:
+        None
     """
+    with open(output_file, 'w') as f:
+        f.write("CAD Pattern Detection Results\n")
+        f.write("==========================\n\n")
+        f.write(f"Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        f.write("Summary:\n")
+        for image_name, count in results:
+            f.write(f"  {image_name}: {count} matches\n")
+        
+        f.write("\nDetailed Results:\n")
+        for image_name, count in results:
+            f.write(f"\nImage: {image_name}\n")
+            f.write(f"  Number of patterns detected: {count}\n")
+            if count == 0:
+                f.write("  Status: No patterns detected\n")
+            elif count < 2:
+                f.write("  Status: Pattern found\n")
+            else:
+                f.write("  Status: Multiple patterns found\n")
+    
+    print(f"Detection report saved to {output_file}")
+
+def main():
+    """
+    Main function to process images and detect patterns
+    """
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='CAD Pattern Detector')
+    
+    # Detection parameters
+    parser.add_argument('--threshold', type=float, default=0.39,
+                        help='Matching threshold (0-1), higher values mean stricter matching')
+    parser.add_argument('--min-scale', type=float, default=0.01,
+                        help='Minimum scale to search')
+    parser.add_argument('--max-scale', type=float, default=0.5,
+                        help='Maximum scale to search')
+    parser.add_argument('--scale-steps', type=int, default=10,
+                        help='Number of scale steps between min and max')
+    parser.add_argument('--no-rotations', action='store_true',
+                        help='Disable rotation detection (only detect at 0 degrees)')
+    
+    # Processing parameters
+    parser.add_argument('--workers', type=int, default=4,
+                        help='Number of worker threads for parallel processing')
+    parser.add_argument('--report', type=str, default='detection_result.txt',
+                        help='Path for the detection report output file')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
     # Determine rotations to use
-    rotations = [0, 90, 180, 270] if detect_rotations else [0]
+    rotations = [0] if args.no_rotations else [0, 90, 180, 270]
     print(f"Detecting patterns with rotations: {rotations}")
 
-    # Initialize the pattern detector with multi-scale and multi-rotation support
-    # Remove the overlap_threshold parameter that's causing the error
+    # Initialize the pattern detector with parameters from command line
     detector = PatternDetector(
-        threshold=0.39,        # Lower threshold to allow for rotation and scaling variations
-        scale_range=(0.01, 0.2), # Search from 10% to 60% of original size
-        scale_steps = 10,        # Use 5 scale steps for efficiency
-        rotations=rotations    # Specify rotations to check
+        threshold=args.threshold,
+        scale_range=(args.min_scale, args.max_scale),
+        scale_steps=args.scale_steps,
+        rotations=rotations
     )
     
     # Load the template pattern
-    template_path = "input_target/targetA.png"
+    template_path = "input_target/butterfly_valve.png"
     template = cv2.imread(template_path)
     
     if template is None:
@@ -102,7 +157,7 @@ def main(detect_rotations=True):
     
     # Process test images from input_CAD directory
     input_dir = "input_CAD"
-    test_images = ["testA.png", "testB.png"]
+    test_images = ["test_butterfly.png"]
     
     # Create partial function with fixed parameters
     process_func = partial(
@@ -113,8 +168,8 @@ def main(detect_rotations=True):
         output_dir=output_dir
     )
     
-    # Process images in parallel using foreach_dopar (similar to R's foreach %dopar%)
-    results = foreach_dopar(test_images, process_func, max_workers=16)
+    # Process images in parallel using foreach_dopar
+    results = foreach_dopar(test_images, process_func, max_workers=args.workers)
     
     # Print summary of results
     print("\nSummary of results:")
@@ -123,9 +178,10 @@ def main(detect_rotations=True):
     
     print("All images processed successfully")
     
+    # Generate detection report
+    generate_detection_report(results, output_file=args.report)
+    
     return results
 
 if __name__ == "__main__":
-    # Set to False to skip rotation detection and save processing time
-    detect_rotations = False
-    main(detect_rotations)
+    main()
