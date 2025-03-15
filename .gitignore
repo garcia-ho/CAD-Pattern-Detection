@@ -2,6 +2,7 @@
 input_CAD/
 input_target/
 output_CAD/
+input_pdf/
 
 # Python bytecode
 __pycache__/
