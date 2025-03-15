@@ -8,6 +8,8 @@ import pytesseract
 import numpy as np
 from PIL import Image
 import io
+import concurrent.futures
+import multiprocessing
 
 def extract_text_from_pdf_with_ocr(pdf_path, output_txt_path=None):
     """
@@ -87,34 +89,28 @@ def count_occurrences(text, target_string="AHU"):
     # Case-insensitive search for whole word
     return len(re.findall(r'\b' + re.escape(target_string) + r'\b', text, re.IGNORECASE))
 
-def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity=0.6):
+def process_pdf_page(args):
     """
-    Find and highlight occurrences of "AHU" in PDF with red transparent boxes.
-    Uses enhanced OCR techniques for better detection.
+    Process a single PDF page to find "AHU" occurrences.
+    Designed to be used with multiprocessing.
     
     Args:
-        input_pdf (str): Path to input PDF
-        output_pdf (str): Path to save highlighted PDF
-        target_string (str): String to highlight
-        sensitivity (float): OCR sensitivity threshold (lower = more sensitive)
+        args (tuple): (doc_path, page_num, target_string, dpi)
+    
+    Returns:
+        dict: Contains page number, found boxes, and processing information
     """
-    # Open the PDF
-    doc = fitz.open(input_pdf)
-    total_occurrences = 0
+    doc_path, page_num, target_string, dpi = args
     
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
-    
-    # Process each page
-    for page_num, page in enumerate(doc):
-        print(f"Processing page {page_num + 1}/{len(doc)} of {os.path.basename(input_pdf)}")
+    try:
+        # Open the document (each process needs its own handle)
+        doc = fitz.open(doc_path)
+        page = doc[page_num]
         
-        # Get page dimensions
-        page_width = page.rect.width
-        page_height = page.rect.height
+        print(f"Processing page {page_num + 1}/{len(doc)} of {os.path.basename(doc_path)}")
         
-        # Convert page to ultra-high-resolution image for OCR (900 DPI for better detection of small text)
-        pix = page.get_pixmap(matrix=fitz.Matrix(600/72, 600/72), alpha=False)
+        # Convert page to high-resolution image for OCR
+        pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False)
         img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
         
         # Convert to RGB if needed
@@ -259,7 +255,7 @@ def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity
                                 'source': f"img{img_idx}-config{config_idx}"
                             })
                 except Exception as e:
-                    print(f"OCR error with configuration {config_idx} on image {img_idx}: {e}")
+                    print(f"OCR error with configuration {config_idx} on image {img_idx} on page {page_num+1}: {e}")
         
         # Deduplicate boxes by merging overlapping ones
         merged_boxes = []
@@ -308,9 +304,79 @@ def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity
                 if is_new:
                     merged_boxes.append(box)
         
+        # Close the document
+        doc.close()
+        
+        return {
+            'page_num': page_num,
+            'boxes': merged_boxes,
+            'scale': 72 / dpi  # Need this for coordinate conversion
+        }
+        
+    except Exception as e:
+        print(f"Error processing page {page_num+1}: {e}")
+        return {
+            'page_num': page_num,
+            'boxes': [],
+            'error': str(e)
+        }
+
+def highlight_ahu_in_pdf_parallel(input_pdf, output_pdf, target_string="AHU", max_workers=None):
+    """
+    Find and highlight occurrences of "AHU" in PDF with red transparent boxes.
+    Uses parallel processing for improved performance.
+    
+    Args:
+        input_pdf (str): Path to input PDF
+        output_pdf (str): Path to save highlighted PDF
+        target_string (str): String to highlight
+        max_workers (int): Maximum number of parallel workers (None = auto)
+    
+    Returns:
+        int: Total number of occurrences found
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
+    
+    # Get CPU count if max_workers is None
+    if max_workers is None:
+        max_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave one CPU free
+    
+    # Open the PDF to get page count
+    doc = fitz.open(input_pdf)
+    num_pages = len(doc)
+    doc.close()
+    
+    print(f"Processing {os.path.basename(input_pdf)} with {max_workers} workers")
+    print(f"Total pages: {num_pages}")
+    
+    # Prepare tasks for parallel processing
+    tasks = [(input_pdf, i, target_string, 600) for i in range(num_pages)]
+    
+    # Process pages in parallel
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(process_pdf_page, tasks))
+    
+    # Open the PDF again for highlighting (must be done in main process)
+    doc = fitz.open(input_pdf)
+    
+    # Track total occurrences
+    total_occurrences = 0
+    
+    # Apply highlights based on results
+    for result in results:
+        if not result or 'error' in result:
+            continue
+            
+        page_num = result['page_num']
+        boxes = result['boxes']
+        scale = result['scale']
+        
+        page = doc[page_num]
+        
         # Add highlights to PDF
-        page_occurrences = 0
-        for box in merged_boxes:
+        for box in boxes:
             # Add padding around the box for better visibility
             padding = int(box['h'] * 0.3)  # 30% padding
             x = max(0, box['x'] - padding)
@@ -318,8 +384,7 @@ def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity
             w = box['w'] + padding * 2
             h = box['h'] + padding * 2
             
-            # Convert OCR coordinates (at 900 DPI) to PDF coordinates
-            scale = 72 / 600  # Convert from 900 DPI to 72 DPI (PDF points)
+            # Convert OCR coordinates to PDF coordinates
             pdf_x = x * scale
             pdf_y = y * scale
             pdf_w = w * scale
@@ -332,11 +397,8 @@ def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity
             highlight.set_opacity(0.4)  # Transparency
             highlight.update()
             
-            page_occurrences += 1
-            print(f"  - Found '{box['text']}' as potential 'AHU' match (confidence: {box['conf']:.1f}, type: {box['match_type']})")
-        
-        total_occurrences += page_occurrences
-        print(f"  Found {page_occurrences} occurrences on page {page_num + 1}")
+            total_occurrences += 1
+            print(f"  - Found '{box['text']}' on page {page_num + 1} (confidence: {box['conf']:.1f}, type: {box['match_type']})")
     
     # Save the highlighted PDF
     doc.save(output_pdf)
@@ -347,12 +409,32 @@ def highlight_ahu_in_pdf(input_pdf, output_pdf, target_string="AHU", sensitivity
     
     return total_occurrences
 
-def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="String_match/output"):
+def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="String_match/output", max_workers=None):
     """
     Process all PDFs in the input folder, find AHU occurrences and highlight them.
+    Uses parallel processing for better performance.
+    
+    Args:
+        input_folder (str): Path to folder containing PDFs
+        output_folder (str): Path to save highlighted PDFs and report
+        max_workers (int): Maximum number of workers per PDF
     """
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
+    
+    # Get optimal number of workers if not specified
+    if max_workers is None:
+        max_workers = max(1, multiprocessing.cpu_count() - 1)  # Leave one CPU free
+    
+    # Get list of PDFs to process
+    pdf_files = [f for f in os.listdir(input_folder) if f.lower().endswith('.pdf')]
+    
+    if not pdf_files:
+        print(f"No PDF files found in {input_folder}")
+        return
+    
+    print(f"Found {len(pdf_files)} PDF files to process")
+    print(f"Using up to {max_workers} CPU cores per PDF")
     
     # Create a report file
     report_path = os.path.join(output_folder, "ahu_detection_report.txt")
@@ -364,23 +446,22 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
         processed_files = 0
         
         # Process each PDF in the input folder
-        for filename in os.listdir(input_folder):
-            if filename.lower().endswith('.pdf'):
-                input_path = os.path.join(input_folder, filename)
-                base_name = os.path.splitext(filename)[0]
-                highlighted_pdf_path = os.path.join(output_folder, f"{base_name}_highlighted.pdf")
-                
-                print(f"\nProcessing {filename}...")
-                
-                # Find and highlight AHU occurrences
-                occurrences = highlight_ahu_in_pdf(input_path, highlighted_pdf_path)
-                
-                processed_files += 1
-                total_occurrences += occurrences
-                
-                # Write to report
-                report.write(f"File: {filename}\n")
-                report.write(f"AHU occurrences: {occurrences}\n\n")
+        for filename in pdf_files:
+            input_path = os.path.join(input_folder, filename)
+            base_name = os.path.splitext(filename)[0]
+            highlighted_pdf_path = os.path.join(output_folder, f"{base_name}_highlighted.pdf")
+            
+            print(f"\nProcessing {filename}...")
+            
+            # Find and highlight AHU occurrences
+            occurrences = highlight_ahu_in_pdf_parallel(input_path, highlighted_pdf_path, max_workers=max_workers)
+            
+            processed_files += 1
+            total_occurrences += occurrences
+            
+            # Write to report
+            report.write(f"File: {filename}\n")
+            report.write(f"AHU occurrences: {occurrences}\n\n")
         
         # Write summary
         report.write("\nSummary\n")
@@ -394,6 +475,8 @@ if __name__ == "__main__":
     # Set up command-line argument parsing
     parser = argparse.ArgumentParser(description="Find and highlight 'AHU' occurrences in PDFs using OCR")
     parser.add_argument("pdf_file", nargs="?", help="Optional: specific PDF file to process")
+    parser.add_argument("--cores", type=int, default=16, 
+                        help="Number of CPU cores to use (default: auto-detect)")
     
     args = parser.parse_args()
     
@@ -407,7 +490,7 @@ if __name__ == "__main__":
             output_pdf = os.path.join("String_match/output", f"{base_name}_highlighted.pdf")
             
             os.makedirs("String_match/output", exist_ok=True)
-            highlight_ahu_in_pdf(input_path, output_pdf)
+            highlight_ahu_in_pdf_parallel(input_path, output_pdf, max_workers=args.cores)
     else:
         # Process all PDFs in the folder
-        process_all_pdfs()
+        process_all_pdfs(max_workers=args.cores)
