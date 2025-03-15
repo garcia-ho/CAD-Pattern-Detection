@@ -1,8 +1,0 @@
-AHU Detection Report
-===================
-
-
-Summary
-=======
-Total files processed: 0
-Total occurrences of 'AHU': 0

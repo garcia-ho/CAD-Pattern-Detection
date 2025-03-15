@@ -2,7 +2,8 @@
 input_CAD/
 input_target/
 output_CAD/
-input_pdf/
+String_match/input_pdf
+String_match/output
 
 # Python bytecode
 __pycache__/
