@@ -36,7 +36,8 @@ def load_target_strings(target_file="target.txt"):
 
 def generate_distinct_colors(n):
     """
-    Generate n visually distinct colors.
+    Generate n visually distinct colors with high contrast.
+    Uses HSV color space with well-spaced hues and alternating saturation/value patterns.
     
     Args:
         n (int): Number of colors to generate
@@ -45,16 +46,31 @@ def generate_distinct_colors(n):
         list: List of RGB tuples (values from 0 to 1)
     """
     colors = []
+    
+    # Golden ratio conjugate creates maximally separated hues
+    golden_ratio_conjugate = 0.618033988749895
+    
+    # Start with a random offset for better color distribution
+    h = random.random()
+    
+    # Create patterns for saturation and value to enhance contrast
+    saturations = [1.0, 0.7, 1.0, 0.7, 0.9]
+    values = [1.0, 1.0, 0.7, 0.9, 0.8]
+    
     for i in range(n):
-        # Use HSV color space for better distinction
-        # Vary the hue across the spectrum, keep saturation and value high
-        h = i / n
-        s = 0.8  # High saturation
-        v = 0.9  # High value
+        # Create well-spaced hues using the golden ratio conjugate
+        h = (h + golden_ratio_conjugate) % 1.0
+        
+        # Alternate between high saturation/value combinations for better contrast
+        s = saturations[i % len(saturations)]
+        v = values[i % len(values)]
         
         # Convert HSV to RGB
         rgb = colorsys.hsv_to_rgb(h, s, v)
         colors.append(rgb)
+    
+    # Randomize the order of colors to avoid adjacent similar colors
+    random.shuffle(colors)
     
     return colors
 
@@ -139,131 +155,127 @@ def count_occurrences(text, target_string="AHU"):
 def process_pdf_page(args):
     """
     Process a single PDF page to find occurrences of target strings.
+    Simplified approach with focus on sensitive detection.
     
     Args:
-        args (tuple): (doc_path, page_num, target_strings, dpi, color_map)
+        args (tuple): (doc_path, page_num, target_strings, dpi)
     
     Returns:
         dict: Contains page number, found boxes, and processing information
     """
-    doc_path, page_num, target_strings, dpi, color_map = args
+    doc_path, page_num, target_strings, dpi = args
     
     try:
-        # Open the document (each process needs its own handle)
+        # Open the document
         doc = fitz.open(doc_path)
         page = doc[page_num]
         
-        print(f"Processing page {page_num + 1}/{len(doc)}")
+        # Convert page to image
+        pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False, colorspace="gray")
+        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
         
-        # Convert page to high-resolution image for OCR
-        pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False)
-        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        # SIMPLIFIED PREPROCESSING
         
-        # Convert to RGB if needed
-        if pix.n == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+        # 1. Standard normalization and thresholding
+        img_norm = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+        binary1 = cv2.adaptiveThreshold(img_norm, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                     cv2.THRESH_BINARY, 11, 7)
         
-        # IMAGE PREPROCESSING PIPELINE
+        # 2. Enhanced processing for small text
+        kernel_sharpen = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+        img_sharp = cv2.filter2D(img_norm, -1, kernel_sharpen)
+        _, binary2 = cv2.threshold(img_sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
-        # 1. Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        
-        # 2. Store original grayscale for processing
-        gray_orig = gray.copy()
-        
-        # 3. Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to enhance contrast
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        gray_clahe = clahe.apply(gray)
-        
-        # 4. Apply adaptive thresholding with different parameters
-        binary1 = cv2.adaptiveThreshold(gray_clahe, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                    cv2.THRESH_BINARY, 15, 9)
-        
-        binary2 = cv2.adaptiveThreshold(gray_clahe, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                    cv2.THRESH_BINARY, 9, 3)
-        
-        # 5. Process images to remove lines and curves near text
-        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
-        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 25))
-        
-        horizontal_lines = cv2.morphologyEx(255-binary1, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
-        vertical_lines = cv2.morphologyEx(255-binary1, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
-        
-        lines = cv2.add(horizontal_lines, vertical_lines)
-        no_lines = cv2.subtract(255-binary1, lines)
-        
-        # 6. Create multiple processed images for better OCR accuracy
-        kernel1 = np.ones((2, 2), np.uint8)
-        proc_img1 = cv2.morphologyEx(binary1, cv2.MORPH_CLOSE, kernel1)
-        
-        kernel2 = np.ones((1, 1), np.uint8)
-        proc_img2 = cv2.morphologyEx(binary2, cv2.MORPH_OPEN, kernel2)
-        
-        proc_img3 = 255 - no_lines
-        
-        # 7. Convert all processed images to PIL format
-        pil_img1 = Image.fromarray(proc_img1)
-        pil_img2 = Image.fromarray(proc_img2)
-        pil_img3 = Image.fromarray(proc_img3)
-        pil_img_orig = Image.fromarray(gray_orig)
-        
-        # Configure tesseract for optimal text detection
-        configs = [
-            '--oem 3 --psm 11 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."',
-            '--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."',
-            '--oem 3 --psm 3 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."'
+        # Convert to PIL format for OCR
+        pil_imgs = [
+            Image.fromarray(binary1),  # Standard processing
+            Image.fromarray(binary2)   # Enhanced for small text
         ]
         
-        # Process with multiple configurations and images
+        # Simplified tesseract configuration - just two effective modes
+        configs = [
+            # Standard configuration - good balance of accuracy and recall
+            '--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."',
+            
+            # Sparse text mode - better for detecting isolated text in drawings
+            '--oem 3 --psm 11 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."'
+        ]
+        
+        # Process with OCR - simplified approach
         all_boxes = []
         
-        for img_idx, pil_img in enumerate([pil_img1, pil_img2, pil_img3, pil_img_orig]):
+        # Convert target strings to uppercase for matching
+        target_strings_upper = [t.strip().upper() for t in target_strings]
+        
+        # Process all images with both configurations
+        for img_idx, pil_img in enumerate(pil_imgs):
             for config_idx, config in enumerate(configs):
-                # Skip some combinations to reduce processing time
-                if img_idx == 3 and config_idx > 1:
-                    continue
-                
                 try:
                     # Get OCR data with bounding boxes
                     ocr_data = pytesseract.image_to_data(pil_img, config=config, output_type=pytesseract.Output.DICT)
                     
                     # Process OCR results
                     for i, text in enumerate(ocr_data['text']):
-                        # Skip empty text or very low confidence
-                        if not text.strip() or ocr_data['conf'][i] < 0:
+                        # Skip empty text
+                        if not text.strip():
                             continue
                         
-                        # Check each target string
+                        # Accept very low confidence results to maximize recall
+                        # For black and white technical drawings, even low confidence can be useful
+                        if ocr_data['conf'][i] < 0:  # Only skip negative confidence
+                            continue
+                        
+                        # Get the bounding box coordinates
+                        x = ocr_data['left'][i]
+                        y = ocr_data['top'][i]
+                        w = ocr_data['width'][i]
+                        h = ocr_data['height'][i]
+                        conf = ocr_data['conf'][i]
+                        
+                        # Normalize text for matching
                         normalized_text = text.strip().upper()
                         
-                        for target_string in target_strings:
-                            target_upper = target_string.upper()
+                        # SIMPLIFIED MATCHING STRATEGY - JUST THREE APPROACHES
+                        for target_idx, target_upper in enumerate(target_strings_upper):
+                            target_string = target_strings[target_idx]  # Original case
+                            found_match = False
+                            match_type = ""
                             
-                            # Check if target string is in the text
-                            if target_upper in normalized_text:
-                                # Get the bounding box coordinates
-                                x = ocr_data['left'][i]
-                                y = ocr_data['top'][i]
-                                w = ocr_data['width'][i]
-                                h = ocr_data['height'][i]
-                                conf = ocr_data['conf'][i]
+                            # 1. EXACT MATCH - target equals the text
+                            if target_upper == normalized_text:
+                                found_match = True
+                                match_type = "exact"
                                 
-                                # Add box info with target string info for highlighting
+                            # 2. CONTAINED MATCH - target appears in the text
+                            # This catches cases where the target is part of a longer string
+                            elif target_upper in normalized_text:
+                                found_match = True
+                                match_type = "contained"
+                            
+                            # 3. WORD MATCH - target appears as a word in text
+                            # This helps with targets that might be part of multi-word text
+                            elif target_upper in normalized_text.split():
+                                found_match = True
+                                match_type = "word"
+                            
+                            # Add the match if found
+                            if found_match:
                                 all_boxes.append({
-                                    'x': x, 'y': y, 'w': w, 'h': h, 
+                                    'x': x, 'y': y, 'w': w, 'h': h,
                                     'text': text, 'conf': conf,
                                     'target': target_string,
-                                    'source': f"img{img_idx}-config{config_idx}"
+                                    'source': f"img{img_idx}-config{config_idx}",
+                                    'match_type': match_type
                                 })
                 
                 except Exception as e:
                     print(f"OCR error with configuration {config_idx} on image {img_idx} on page {page_num+1}: {e}")
         
-        # Deduplicate boxes for each target string
+        # SIMPLIFIED DEDUPLICATION
         merged_boxes = []
         
+        # Group boxes by target string
         if all_boxes:
-            # Group boxes by target string
             boxes_by_target = {}
             for box in all_boxes:
                 target = box['target']
@@ -271,53 +283,49 @@ def process_pdf_page(args):
                     boxes_by_target[target] = []
                 boxes_by_target[target].append(box)
             
-            # Process each target string separately for deduplication
+            # Process each target string separately
             for target, boxes in boxes_by_target.items():
                 # Sort by confidence
                 boxes = sorted(boxes, key=lambda box: box['conf'], reverse=True)
                 
+                # Simple overlap-based deduplication
                 target_merged_boxes = []
                 for box in boxes:
-                    # Check if this box overlaps with any already merged box
+                    # Check if this box overlaps with any existing box
                     is_new = True
                     box_rect = (box['x'], box['y'], box['x'] + box['w'], box['y'] + box['h'])
                     
-                    for idx, merged_box in enumerate(target_merged_boxes):
+                    for merged_box in target_merged_boxes:
                         merged_rect = (merged_box['x'], merged_box['y'], 
-                                       merged_box['x'] + merged_box['w'], merged_box['y'] + merged_box['h'])
+                                     merged_box['x'] + merged_box['w'], 
+                                     merged_box['y'] + merged_box['h'])
                         
-                        # Calculate intersection
+                        # Calculate overlap
                         x1 = max(box_rect[0], merged_rect[0])
                         y1 = max(box_rect[1], merged_rect[1])
                         x2 = min(box_rect[2], merged_rect[2])
                         y2 = min(box_rect[3], merged_rect[3])
                         
-                        # Check for overlap
+                        # If boxes overlap
                         if x1 < x2 and y1 < y2:
                             overlap_area = (x2 - x1) * (y2 - y1)
                             box_area = box['w'] * box['h']
                             merged_area = merged_box['w'] * merged_box['h']
                             
-                            # If significant overlap, merge boxes by taking the union
-                            if overlap_area > 0.5 * min(box_area, merged_area):
+                            # If significant overlap, consider it the same match
+                            if overlap_area > 0.25 * min(box_area, merged_area):
                                 is_new = False
-                                # Keep the higher confidence data but expand the box to contain both
-                                if box['conf'] > merged_box['conf']:
-                                    merged_box['text'] = box['text']
-                                    merged_box['conf'] = box['conf']
                                 
-                                # Expand to union
-                                merged_box['x'] = min(box_rect[0], merged_rect[0])
-                                merged_box['y'] = min(box_rect[1], merged_rect[1])
-                                merged_box['w'] = max(box_rect[2], merged_rect[2]) - merged_box['x']
-                                merged_box['h'] = max(box_rect[3], merged_rect[3]) - merged_box['y']
+                                # Keep the higher confidence match
+                                if box['conf'] > merged_box['conf']:
+                                    merged_box.update(box)
                                 break
                     
-                    # Add new box if not merged
+                    # Add new box if not overlapping
                     if is_new:
                         target_merged_boxes.append(box)
                 
-                # Add all merged boxes for this target to the final list
+                # Add all merged boxes for this target
                 merged_boxes.extend(target_merged_boxes)
         
         # Close the document
@@ -326,7 +334,7 @@ def process_pdf_page(args):
         return {
             'page_num': page_num,
             'boxes': merged_boxes,
-            'scale': 72 / dpi  # Need this for coordinate conversion
+            'scale': 72 / dpi
         }
         
     except Exception as e:
@@ -340,7 +348,7 @@ def process_pdf_page(args):
 def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=16, dpi=300):
     """
     Find and highlight occurrences of multiple strings in PDF with colored boxes.
-    Enhanced with better handling of special cases.
+    Simplified approach for better detection of small text.
     
     Args:
         input_pdf (str): Path to input PDF
@@ -373,8 +381,8 @@ def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=
     num_pages = len(doc)
     doc.close()
     
-    # Prepare tasks for processing - ADD THE COLOR_MAP PARAMETER HERE
-    tasks = [(input_pdf, i, target_strings, dpi, color_map) for i in range(num_pages)]
+    # Prepare tasks for processing
+    tasks = [(input_pdf, i, target_strings, dpi) for i in range(num_pages)]
     
     # Process pages (either in parallel or sequentially)
     results = []
@@ -411,20 +419,14 @@ def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=
         
         page = doc[page_num]
         
-        # Add highlights to PDF - batch process for efficiency
+        # Add highlights to PDF
         for box in boxes:
             target = box['target']
+            match_type = box.get('match_type', 'unknown')
             
-            # Adjust padding based on special cases
-            if box.get('in_margin', False):
-                # Use less padding in margins to avoid crossing page boundaries
-                padding = int(box['h'] * 0.15)  # 15% padding
-            elif box.get('near_line', False):
-                # Use more padding when near lines to ensure full coverage
-                padding = int(box['h'] * 0.25)  # 25% padding
-            else:
-                # Standard padding
-                padding = int(box['h'] * 0.2)  # 20% padding
+            # Calculate highlight box with minimal padding
+            # Minimal padding to keep highlights precise
+            padding = max(1, int(box['h'] * 0.1))  # Just 10% of text height
             
             x = max(0, box['x'] - padding)
             y = max(0, box['y'] - padding)
@@ -437,30 +439,32 @@ def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=
             pdf_w = w * scale
             pdf_h = h * scale
             
-            # Get color for this target
+            # Get color for this target - use more contrasting colors
             r, g, b = color_map.get(target, (1, 0, 0))  # Default to red if not found
-            
-            # Adjust opacity based on match confidence/score
-            base_opacity = 0.4
-            if 'score' in box:
-                if box['score'] < 80:  # Lower scoring matches (fuzzy/partial)
-                    opacity = max(0.3, base_opacity * (box['score'] / 100))
-                    stroke_width = 0.7  # Thinner borders for less confident matches
-                else:  # Higher scoring matches
-                    opacity = base_opacity
-                    stroke_width = 1.0
-            else:
-                opacity = base_opacity
-                stroke_width = 1.0
             
             # Create rectangle annotation with fill
             rect = fitz.Rect(pdf_x, pdf_y, pdf_x + pdf_w, pdf_y + pdf_h)
             highlight = page.add_rect_annot(rect)
-            highlight.set_colors(stroke=(r, g, b), fill=(r, g, b, 0.2))
-            highlight.set_opacity(opacity)
             
-            # Set border width
-            highlight.set_border(width=stroke_width)
+            # MORE TRANSPARENT FILL but STRONGER BORDER for contrast
+            highlight.set_colors(stroke=(r, g, b), fill=(r, g, b, 0.05))  # Very transparent fill
+            
+            # Use dashed border for better visibility when colors are similar
+            border_style_options = ["[1 1]", "[2 2]", "[3 3]", "[4 4]", "[1 3]", "[3 1]", "[]"]
+            border_style = border_style_options[hash(target) % len(border_style_options)]  # Unique dashing per target
+            highlight.set_border(width=0.5, dashes=border_style)  # Thicker border with dash pattern
+            
+            # Set different opacity based on match type
+            match_opacities = {
+                "exact": 0.7,    
+                "contained": 0.5, 
+                "word": 0.6,     
+                "unknown": 0.4   
+            }
+            highlight.set_opacity(match_opacities.get(match_type, 0.5))
+            
+            # Add a tooltip showing the target
+            highlight.set_info({"title": target})
             
             highlight.update()
             
@@ -479,7 +483,7 @@ def get_cpu_info():
         total_cores = multiprocessing.cpu_count()
         return {
             "total_cores": total_cores,
-            "recommended_cores": min(16, total_cores)  # Use at most 16 cores by default
+            "recommended_cores": min(2, total_cores)  # Use at most 16 cores by default
         }
     except:
         return {"total_cores": "Unknown", "recommended_cores": 4}
@@ -614,9 +618,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find and highlight target strings in PDFs using OCR")
     parser.add_argument("pdf_file", nargs="?", help="Optional: specific PDF file to process")
     parser.add_argument("--targets", default="String_match/target.txt", help="File containing target strings (one per line)")
-    parser.add_argument("--cores", type=int, default=16, 
+    parser.add_argument("--cores", type=int, default=4, 
                         help="Number of CPU cores to use (default: 16, 0 = disable parallel processing)")
-    parser.add_argument("--dpi", type=int, default=300, 
+    parser.add_argument("--dpi", type=int, default=400, 
                         help="DPI resolution for OCR (higher = more accurate but slower, default: 300)")
 
     args = parser.parse_args()
