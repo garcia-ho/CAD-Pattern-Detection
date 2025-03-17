@@ -13,6 +13,16 @@ import multiprocessing
 import csv
 import random
 import colorsys
+import time
+import pdfplumber
+import pdf2image
+import pdfminer
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTTextContainer, LTChar, LTTextLine
+from pdfminer.pdfpage import PDFPage
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import PDFPageAggregator
+from pdfminer.layout import LAParams
 
 def load_target_strings(target_file="target.txt"):
     """
@@ -70,6 +80,7 @@ def generate_distinct_colors(n):
         colors.append(rgb)
     
     # Randomize the order of colors to avoid adjacent similar colors
+    
     random.shuffle(colors)
     
     return colors
@@ -87,7 +98,7 @@ def extract_text_from_pdf_with_ocr(pdf_path, output_txt_path=None):
         tuple: (Path to the output text file, extracted text)
     """
     # Default output path if not specified
-    if output_txt_path is None:
+    if (output_txt_path is None):
         base_name = os.path.splitext(os.path.basename(pdf_path))[0]
         output_txt_path = os.path.join("String_match/output", f"{base_name}.txt")
     
@@ -154,61 +165,163 @@ def count_occurrences(text, target_string="AHU"):
 
 def process_pdf_page(args):
     """
-    Process a single PDF page to find occurrences of target strings.
-    Simplified approach with focus on sensitive detection.
+    Process a single PDF page to find occurrences of target strings using OCR only.
+    Aggressively filters out grey lines/text (RGB >= 128,128,128) and focuses on detecting 
+    only black text (RGB close to 0,0,0) on white background, including text partially 
+    obscured by lines.
     
     Args:
-        args (tuple): (doc_path, page_num, target_strings, dpi)
+        args (tuple): (doc_path, page_num, target_strings, dpi, sensitivity)
     
     Returns:
         dict: Contains page number, found boxes, and processing information
     """
-    doc_path, page_num, target_strings, dpi = args
+    if len(args) == 5:
+        doc_path, page_num, target_strings, dpi, sensitivity = args
+    else:
+        # Default sensitivity for backward compatibility
+        doc_path, page_num, target_strings, dpi = args
+        sensitivity = 5
+    
+    # Apply higher sensitivity for more aggressive detection
+    sensitivity = max(5, min(10, sensitivity))
     
     try:
-        # Open the document
+        # Initialize all_boxes to store matched text
+        all_boxes = []
+        
+        # Extract filename from path for output images
+        base_filename = os.path.splitext(os.path.basename(doc_path))[0]
+        
+        # Open the document with PyMuPDF for page rendering only
         doc = fitz.open(doc_path)
         page = doc[page_num]
         
-        # Convert page to image
-        pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False, colorspace="gray")
-        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
-        
-        # SIMPLIFIED PREPROCESSING
-        
-        # 1. Standard normalization and thresholding
-        img_norm = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
-        binary1 = cv2.adaptiveThreshold(img_norm, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                     cv2.THRESH_BINARY, 11, 7)
-        
-        # 2. Enhanced processing for small text
-        kernel_sharpen = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-        img_sharp = cv2.filter2D(img_norm, -1, kernel_sharpen)
-        _, binary2 = cv2.threshold(img_sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Convert to PIL format for OCR
-        pil_imgs = [
-            Image.fromarray(binary1),  # Standard processing
-            Image.fromarray(binary2)   # Enhanced for small text
-        ]
-        
-        # Simplified tesseract configuration - just two effective modes
-        configs = [
-            # Standard configuration - good balance of accuracy and recall
-            '--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."',
-            
-            # Sparse text mode - better for detecting isolated text in drawings
-            '--oem 3 --psm 11 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -."'
-        ]
-        
-        # Process with OCR - simplified approach
-        all_boxes = []
-        
-        # Convert target strings to uppercase for matching
+        # Convert target strings to uppercase for case-insensitive matching
         target_strings_upper = [t.strip().upper() for t in target_strings]
         
-        # Process all images with both configurations
-        for img_idx, pil_img in enumerate(pil_imgs):
+        # Create variants for OCR error handling
+        target_variants = {}
+        for i, target in enumerate(target_strings_upper):
+            variants = [target]  # Original target
+            
+            # Add common OCR errors
+            if 'O' in target:
+                variants.append(target.replace('O', '0'))
+            if '0' in target:
+                variants.append(target.replace('0', 'O'))
+            if 'I' in target:
+                variants.append(target.replace('I', '1'))
+            if '1' in target:
+                variants.append(target.replace('1', 'I'))
+            if 'S' in target:
+                variants.append(target.replace('S', '5'))
+            if '5' in target:
+                variants.append(target.replace('5', 'S'))
+            if 'Z' in target:
+                variants.append(target.replace('Z', '2'))
+            if '2' in target:
+                variants.append(target.replace('2', 'Z'))
+            if 'B' in target:
+                variants.append(target.replace('B', '8'))
+            if '8' in target:
+                variants.append(target.replace('8', 'B'))
+                
+            # Handle spaces and dashes
+            if ' ' in target:
+                variants.append(target.replace(' ', ''))  # Remove spaces
+                variants.append(target.replace(' ', '-'))  # Space to dash
+            
+            if '-' in target:
+                variants.append(target.replace('-', ''))  # Remove dashes
+                variants.append(target.replace('-', ' '))  # Dash to space
+                
+            # Store all unique variants
+            target_variants[i] = list(set(variants))
+        
+        # SIMPLIFIED PREPROCESSING: FILTER GREY FIRST, THEN USE NO_LINES_CLEANED APPROACH
+        print(f"Page {page_num+1}: Filtering grey elements and cleaning for better text detection...")
+
+        # Render the page with RGB color
+        pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False)
+
+        # Convert the pixmap data to a numpy array
+        if pix.n == 1:  # Grayscale
+            img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
+            img_rgb = np.stack([img, img, img], axis=2)
+        elif pix.n == 3:  # RGB
+            img_rgb = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
+        elif pix.n == 4:  # RGBA
+            img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 4)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+
+        # Extract filename from path for output images
+        base_filename = os.path.splitext(os.path.basename(doc_path))[0]
+
+        # STEP 1: FILTER GREY - Remove all pixels with RGB values >= 128,128,128
+        # Create a mask where all RGB values must be < 128 (non-grey elements)
+        black_mask = np.logical_and.reduce((
+            img_rgb[:,:,0] < 128,
+            img_rgb[:,:,1] < 128,
+            img_rgb[:,:,2] < 128
+        ))
+
+        # Create a new image with white background
+        filtered_img = np.ones_like(img_rgb) * 255  # White background
+
+        # Set the black text pixels
+        filtered_img[black_mask] = [0, 0, 0]  # Black text
+
+        # STEP 2: CONVERT TO GRAYSCALE
+        gray = cv2.cvtColor(filtered_img, cv2.COLOR_RGB2GRAY)
+
+        # STEP 3: LINE REMOVAL - Remove horizontal and vertical lines
+        # Create a copy for line removal
+        img_no_lines = gray.copy()
+
+        # Detect and remove horizontal lines
+        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
+        horizontal_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+
+        # Detect and remove vertical lines
+        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 25))
+        vertical_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
+
+        # Combine horizontal and vertical lines
+        lines = cv2.add(horizontal_lines, vertical_lines)
+
+        # Remove lines from the image (set to white)
+        img_no_lines[lines > 0] = 255
+
+        # STEP 4: CLEAN UP THE NO-LINES IMAGE
+        # Apply light morphological opening to remove small noise
+        kernel = np.ones((2, 2), np.uint8)
+        no_lines_cleaned = cv2.morphologyEx(img_no_lines, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        # Create a collection of processed images for OCR - only using the no_lines_cleaned version
+        filtered_images = [
+            # Only use the no_lines_cleaned version as requested
+            ("no_lines_cleaned", no_lines_cleaned)
+        ]
+
+        # Process the filtered image with OCR
+        for filter_name, filtered_img in filtered_images:
+            # Convert to PIL for OCR
+            pil_img = Image.fromarray(filtered_img)
+            
+            # OCR configs for different text patterns
+            configs = [
+                # Standard config - for normal text blocks
+                '--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
+                
+                # Sparse text config - for CAD drawings with isolated text
+                '--oem 3 --psm 11 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
+                
+                # Single line config - for text in a single line
+                '--oem 3 --psm 7 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
+            ]
+            
+            # Process with each OCR config
             for config_idx, config in enumerate(configs):
                 try:
                     # Get OCR data with bounding boxes
@@ -220,58 +333,79 @@ def process_pdf_page(args):
                         if not text.strip():
                             continue
                         
-                        # Accept very low confidence results to maximize recall
-                        # For black and white technical drawings, even low confidence can be useful
-                        if ocr_data['conf'][i] < 0:  # Only skip negative confidence
+                        # Apply confidence threshold based on sensitivity
+                        min_confidence = max(25, 50 - (sensitivity * 5))  # More permissive for higher sensitivity
+                        if ocr_data['conf'][i] < min_confidence:
                             continue
                         
-                        # Get the bounding box coordinates
+                        # Get bounding box
                         x = ocr_data['left'][i]
                         y = ocr_data['top'][i]
                         w = ocr_data['width'][i]
                         h = ocr_data['height'][i]
                         conf = ocr_data['conf'][i]
                         
+                        # Skip extremely small or large boxes (likely noise or page boundaries)
+                        if w < 3 or h < 3 or w > pil_img.width * 0.9 or h > pil_img.height * 0.9:
+                            continue
+                        
+                        # Scale coordinates back to original PDF size
+                        scale_to_pdf = 72 / dpi
+                        pdf_x = x * scale_to_pdf
+                        pdf_y = y * scale_to_pdf
+                        pdf_w = w * scale_to_pdf
+                        pdf_h = h * scale_to_pdf
+                        
                         # Normalize text for matching
                         normalized_text = text.strip().upper()
                         
-                        # SIMPLIFIED MATCHING STRATEGY - JUST THREE APPROACHES
+                        # Clean text for matching
+                        cleaned_text = re.sub(r'[^\w\s\-\.]', '', normalized_text)
+                        
+                        # Check matches with each target
                         for target_idx, target_upper in enumerate(target_strings_upper):
-                            target_string = target_strings[target_idx]  # Original case
-                            found_match = False
-                            match_type = ""
+                            target_string = target_strings[target_idx]
+                            curr_variants = target_variants.get(target_idx, [target_upper])
                             
-                            # 1. EXACT MATCH - target equals the text
-                            if target_upper == normalized_text:
-                                found_match = True
-                                match_type = "exact"
+                            for variant in curr_variants:
+                                found_match = False
+                                match_type = ""
                                 
-                            # 2. CONTAINED MATCH - target appears in the text
-                            # This catches cases where the target is part of a longer string
-                            elif target_upper in normalized_text:
-                                found_match = True
-                                match_type = "contained"
-                            
-                            # 3. WORD MATCH - target appears as a word in text
-                            # This helps with targets that might be part of multi-word text
-                            elif target_upper in normalized_text.split():
-                                found_match = True
-                                match_type = "word"
-                            
-                            # Add the match if found
-                            if found_match:
-                                all_boxes.append({
-                                    'x': x, 'y': y, 'w': w, 'h': h,
-                                    'text': text, 'conf': conf,
-                                    'target': target_string,
-                                    'source': f"img{img_idx}-config{config_idx}",
-                                    'match_type': match_type
-                                })
-                
+                                # 1. EXACT MATCH
+                                if variant == normalized_text or variant == cleaned_text:
+                                    found_match = True
+                                    match_type = "exact"
+                                
+                                # 2. WORD MATCH
+                                elif variant in normalized_text.split() or variant in cleaned_text.split():
+                                    found_match = True
+                                    match_type = "word"
+                                
+                                # 3. CONTAINED MATCH
+                                elif variant in normalized_text or variant in cleaned_text:
+                                    found_match = True
+                                    match_type = "contained"
+                                
+                                # If found a match, add to results
+                                if found_match:
+                                    all_boxes.append({
+                                        'x': pdf_x, 'y': pdf_y, 'w': pdf_w, 'h': pdf_h,
+                                        'text': text, 'conf': conf,
+                                        'target': target_string,
+                                        'source': f"{filter_name}-cfg{config_idx}",
+                                        'match_type': match_type,
+                                        'variant': variant
+                                    })
+                                    break
                 except Exception as e:
-                    print(f"OCR error with configuration {config_idx} on image {img_idx} on page {page_num+1}: {e}")
+                    print(f"OCR error with config {config_idx} on filter {filter_name} on page {page_num+1}: {e}")
         
-        # SIMPLIFIED DEDUPLICATION
+        # Close the document
+        doc.close()
+        
+        print(f"Page {page_num+1}: Found {len(all_boxes)} potential matches before deduplication")
+        
+        # DEDUPLICATION
         merged_boxes = []
         
         # Group boxes by target string
@@ -285,13 +419,23 @@ def process_pdf_page(args):
             
             # Process each target string separately
             for target, boxes in boxes_by_target.items():
-                # Sort by confidence
-                boxes = sorted(boxes, key=lambda box: box['conf'], reverse=True)
+                # Define priorities for deduplication
+                match_type_priority = {
+                    "exact": 3,
+                    "word": 2, 
+                    "contained": 1,
+                    "unknown": 0
+                }
                 
-                # Simple overlap-based deduplication
+                # Sort boxes first by location to group nearby detections
+                boxes = sorted(boxes, key=lambda box: (box['y'], box['x']))
+                
+                # Overlap threshold for deduplication
+                overlap_threshold = 0.3
+                
+                # Deduplication
                 target_merged_boxes = []
                 for box in boxes:
-                    # Check if this box overlaps with any existing box
                     is_new = True
                     box_rect = (box['x'], box['y'], box['x'] + box['w'], box['y'] + box['h'])
                     
@@ -312,12 +456,16 @@ def process_pdf_page(args):
                             box_area = box['w'] * box['h']
                             merged_area = merged_box['w'] * merged_box['h']
                             
-                            # If significant overlap, consider it the same match
-                            if overlap_area > 0.25 * min(box_area, merged_area):
+                            if overlap_area > overlap_threshold * min(box_area, merged_area):
                                 is_new = False
                                 
-                                # Keep the higher confidence match
-                                if box['conf'] > merged_box['conf']:
+                                # Compare boxes to keep the better one
+                                box_priority = match_type_priority.get(box.get('match_type', 'unknown'), 0)
+                                merged_priority = match_type_priority.get(merged_box.get('match_type', 'unknown'), 0)
+                                
+                                # Prefer higher match type priority, then higher confidence
+                                if (box_priority > merged_priority) or \
+                                   (box_priority == merged_priority and box['conf'] > merged_box['conf']):
                                     merged_box.update(box)
                                 break
                     
@@ -328,13 +476,12 @@ def process_pdf_page(args):
                 # Add all merged boxes for this target
                 merged_boxes.extend(target_merged_boxes)
         
-        # Close the document
-        doc.close()
+        print(f"Page {page_num+1}: Found {len(merged_boxes)} unique matches after deduplication")
         
         return {
             'page_num': page_num,
             'boxes': merged_boxes,
-            'scale': 72 / dpi
+            'scale': 1.0
         }
         
     except Exception as e:
@@ -345,17 +492,17 @@ def process_pdf_page(args):
             'error': str(e)
         }
 
-def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=16, dpi=300):
+def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=4, dpi=300, sensitivity=5):
     """
-    Find and highlight occurrences of multiple strings in PDF with colored boxes.
-    Simplified approach for better detection of small text.
+    Highlight occurrences of target strings in a PDF and save the result.
     
     Args:
-        input_pdf (str): Path to input PDF
-        output_pdf (str): Path to save highlighted PDF
-        target_strings (list): List of strings to highlight
+        input_pdf (str): Path to the input PDF file
+        output_pdf (str): Path to save the highlighted PDF
+        target_strings (list): List of target strings to find and highlight
         max_workers (int): Maximum number of parallel workers (0 = disable parallel processing)
         dpi (int): DPI resolution for OCR
+        sensitivity (int): Detection sensitivity (1-10, where 1 is strict and 10 is very permissive)
     
     Returns:
         dict: Count of occurrences for each target string
@@ -381,12 +528,12 @@ def highlight_strings_in_pdf(input_pdf, output_pdf, target_strings, max_workers=
     num_pages = len(doc)
     doc.close()
     
-    # Prepare tasks for processing
-    tasks = [(input_pdf, i, target_strings, dpi) for i in range(num_pages)]
+    # Prepare tasks for processing - include sensitivity parameter
+    tasks = [(input_pdf, i, target_strings, dpi, sensitivity) for i in range(num_pages)]
     
     # Process pages (either in parallel or sequentially)
     results = []
-    if parallel_mode:
+    if (parallel_mode):
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             # Process tasks in batches to avoid memory issues
             batch_size = min(100, num_pages)  # Maximum 100 pages per batch
@@ -483,16 +630,16 @@ def get_cpu_info():
         total_cores = multiprocessing.cpu_count()
         return {
             "total_cores": total_cores,
-            "recommended_cores": min(2, total_cores)  # Use at most 16 cores by default
+            "recommended_cores": min(4, total_cores)  # Use at most 16 cores by default
         }
     except:
         return {"total_cores": "Unknown", "recommended_cores": 4}
 
 def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="String_match/output", 
-                   target_file="target.txt", max_workers=16, dpi=300):
+                   target_file="target.txt", max_workers=4, dpi=300, sensitivity=7):
     """
     Process all PDFs in the input folder, find target string occurrences and highlight them.
-    Output results to a CSV file.
+    Output results to a CSV file with timing information.
     
     Args:
         input_folder (str): Path to folder containing PDFs
@@ -500,7 +647,11 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
         target_file (str): Path to file containing target strings
         max_workers (int): Maximum number of workers per PDF (0 = disable parallel processing)
         dpi (int): DPI resolution for OCR
+        sensitivity (int): Detection sensitivity (1-10, where 1 is strict and 10 is very permissive)
     """
+    # Start overall processing time
+    overall_start_time = time.time()
+    
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
     
@@ -553,11 +704,14 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
     csv_path = os.path.join(output_folder, "detection_results.csv")
     
     # Create CSV header row with target strings
-    csv_header = ["Filename"] + target_strings + ["Total"]
+    csv_header = ["Filename"] + target_strings + ["Total", "Processing Time (sec)"]
     
     with open(csv_path, 'w', newline='', encoding='utf-8') as csv_file:
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow(csv_header)
+        
+        # Track total processing time
+        processing_times = []
         
         # Process each PDF in the input folder
         for filename in pdf_files:
@@ -570,6 +724,9 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
             log_file.write(f"- Input: {input_path}\n")
             log_file.write(f"- Output: {highlighted_pdf_path}\n")
             
+            # Start time for this PDF
+            start_time = time.time()
+            
             # Temporarily redirect stdout to log file
             original_stdout = sys.stdout
             sys.stdout = log_file
@@ -578,8 +735,12 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
             occurrences = highlight_strings_in_pdf(
                 input_path, highlighted_pdf_path, 
                 target_strings, max_workers=max_workers, 
-                dpi=dpi
+                dpi=dpi, sensitivity=sensitivity
             )
+            
+            # End time for this PDF
+            end_time = time.time()
+            processing_time = end_time - start_time
             
             # Restore stdout
             sys.stdout = original_stdout
@@ -588,27 +749,42 @@ def process_all_pdfs(input_folder="String_match/input_pdf", output_folder="Strin
             total_count = sum(occurrences.values())
             
             # Print minimal info to console
-            print(f"found {total_count} total occurrences")
+            print(f"found {total_count} total occurrences in {processing_time:.2f} seconds")
             
             # Write results to CSV
             csv_row = [filename]
             for target in target_strings:
                 csv_row.append(occurrences.get(target, 0))
             csv_row.append(total_count)
+            csv_row.append(f"{processing_time:.2f}")
             
             csv_writer.writerow(csv_row)
             
-            # Log occurrences to log file
+            # Log occurrences and timing to log file
             log_file.write("- Occurrences:\n")
             for target, count in occurrences.items():
                 log_file.write(f"  - '{target}': {count}\n")
-            log_file.write(f"- Total: {total_count}\n\n")
+            log_file.write(f"- Total: {total_count}\n")
+            log_file.write(f"- Processing Time: {processing_time:.2f} seconds\n\n")
     
+    # Calculate overall statistics
+    overall_time = time.time() - overall_start_time
+    avg_time = sum(processing_times) / len(processing_times) if processing_times else 0
+    
+    # Write summary statistics
+    log_file.write("\nProcessing Summary:\n")
+    log_file.write(f"- Total files processed: {len(pdf_files)}\n")
+    log_file.write(f"- Total processing time: {overall_time:.2f} seconds\n")
+    log_file.write(f"- Average time per PDF: {avg_time:.2f} seconds\n")
+    if processing_times:
+        log_file.write(f"- Fastest PDF: {min(processing_times):.2f} seconds\n")
+        log_file.write(f"- Slowest PDF: {max(processing_times):.2f} seconds\n")
     log_file.write("\nProcessing completed.\n")
     log_file.close()
     
     print(f"\nProcessing complete!")
     print(f"- Total files processed: {len(pdf_files)}")
+    print(f"- Total processing time: {overall_time:.2f} seconds")
     print(f"- Results saved to: {csv_path}")
     print(f"- Detailed log saved to: {log_path}")
 
@@ -618,29 +794,64 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find and highlight target strings in PDFs using OCR")
     parser.add_argument("pdf_file", nargs="?", help="Optional: specific PDF file to process")
     parser.add_argument("--targets", default="String_match/target.txt", help="File containing target strings (one per line)")
-    parser.add_argument("--cores", type=int, default=4, 
-                        help="Number of CPU cores to use (default: 16, 0 = disable parallel processing)")
-    parser.add_argument("--dpi", type=int, default=400, 
-                        help="DPI resolution for OCR (higher = more accurate but slower, default: 300)")
+    parser.add_argument("--cores", type=int, default=8, 
+                        help="Number of CPU cores to use (default: 4, 0 = disable parallel processing)")
+    parser.add_argument("--dpi", type=int, default=500, 
+                        help="DPI resolution for OCR (higher = more accurate but slower, default: 400)")
+    parser.add_argument("--sensitivity", type=int, default=10,
+                        help="Detection sensitivity (1-10, where 1 is strict and 10 is permissive, default: 5)")
 
     args = parser.parse_args()
     
     if args.pdf_file:
         # Process single file
-        input_path = os.path.join("String_match/input_pdf", args.pdf_file)
+        input_path = args.pdf_file
         if not os.path.exists(input_path):
-            print(f"Error: File not found: {input_path}")
-        else:
-            base_name = os.path.splitext(args.pdf_file)[0]
-            output_pdf = os.path.join("String_match/output", f"{base_name}_highlighted.pdf")
+            # Try with the default path prefix
+            input_path = os.path.join("String_match/input_pdf", args.pdf_file)
+            if not os.path.exists(input_path):
+                print(f"Error: File not found: {args.pdf_file} or {input_path}")
+                sys.exit(1)
+        
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_pdf = os.path.join("String_match/output", f"{base_name}_highlighted.pdf")
+        
+        os.makedirs("String_match/output", exist_ok=True)
+        
+        # Load target strings
+        target_strings = load_target_strings(args.targets)
+        
+        # Create a log file for single-file processing
+        log_path = os.path.join("String_match/output", f"{base_name}_log.txt")
+        with open(log_path, 'w', encoding='utf-8') as log_file:
+            log_file.write(f"Processing file: {input_path}\n")
+            log_file.write(f"Target strings: {', '.join(target_strings)}\n\n")
             
-            os.makedirs("String_match/output", exist_ok=True)
+            # Start timing
+            start_time = time.time()
             
-            # Load target strings
-            target_strings = load_target_strings(args.targets)
+            # Process the file with sensitivity parameter
+            occurrences = highlight_strings_in_pdf(
+                input_path, output_pdf, target_strings, 
+                max_workers=args.cores, dpi=args.dpi, sensitivity=args.sensitivity
+            )
             
-            # Process the file - directly use args.dpi
-            highlight_strings_in_pdf(input_path, output_pdf, target_strings, max_workers=args.cores, dpi=args.dpi)
+            # End timing
+            end_time = time.time()
+            processing_time = end_time - start_time
+            
+            # Log results
+            log_file.write("Occurrences detected:\n")
+            for target, count in occurrences.items():
+                log_file.write(f"- '{target}': {count}\n")
+            
+            total_count = sum(occurrences.values())
+            log_file.write(f"\nTotal occurrences: {total_count}\n")
+            log_file.write(f"Processing time: {processing_time:.2f} seconds\n")
+            
+            print(f"Processing complete: {total_count} occurrences found in {processing_time:.2f} seconds")
+            print(f"Results saved to {output_pdf}")
+            print(f"Log saved to {log_path}")
     else:
-        # Process all PDFs in the folder - directly use args.dpi
-        process_all_pdfs(target_file=args.targets, max_workers=args.cores, dpi=args.dpi)
+        # Process all PDFs in the folder with sensitivity parameter
+        process_all_pdfs(target_file=args.targets, max_workers=args.cores, dpi=args.dpi, sensitivity=args.sensitivity)

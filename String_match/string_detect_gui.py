@@ -388,4 +388,66 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Set up command-line argument parsing
+    parser = argparse.ArgumentParser(description="Find and highlight target strings in PDFs using OCR")
+    parser.add_argument("pdf_file", nargs="?", help="Optional: specific PDF file to process")
+    parser.add_argument("--targets", default="String_match/target.txt", help="File containing target strings (one per line)")
+    parser.add_argument("--cores", type=int, default=4, 
+                        help="Number of CPU cores to use (default: 4, 0 = disable parallel processing)")
+    parser.add_argument("--dpi", type=int, default=300, 
+                        help="DPI resolution for OCR (higher = more accurate but slower, default: 400)")
+
+    args = parser.parse_args()
+    
+    if args.pdf_file:
+        # Process single file
+        input_path = args.pdf_file
+        if not os.path.exists(input_path):
+            # Try with the default path prefix
+            input_path = os.path.join("String_match/input_pdf", args.pdf_file)
+            if not os.path.exists(input_path):
+                print(f"Error: File not found: {args.pdf_file} or {input_path}")
+                sys.exit(1)
+        
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_pdf = os.path.join("String_match/output", f"{base_name}_highlighted.pdf")
+        
+        os.makedirs("String_match/output", exist_ok=True)
+        
+        # Load target strings
+        target_strings = load_target_strings(args.targets)
+        
+        # Create a log file for single-file processing
+        log_path = os.path.join("String_match/output", f"{base_name}_log.txt")
+        with open(log_path, 'w', encoding='utf-8') as log_file:
+            log_file.write(f"Processing file: {input_path}\n")
+            log_file.write(f"Target strings: {', '.join(target_strings)}\n\n")
+            
+            # Start timing
+            start_time = time.time()
+            
+            # Process the file
+            occurrences = highlight_strings_in_pdf(
+                input_path, output_pdf, target_strings, 
+                max_workers=args.cores, dpi=args.dpi
+            )
+            
+            # End timing
+            end_time = time.time()
+            processing_time = end_time - start_time
+            
+            # Log results
+            log_file.write("Occurrences detected:\n")
+            for target, count in occurrences.items():
+                log_file.write(f"- '{target}': {count}\n")
+            
+            total_count = sum(occurrences.values())
+            log_file.write(f"\nTotal occurrences: {total_count}\n")
+            log_file.write(f"Processing time: {processing_time:.2f} seconds\n")
+            
+            print(f"Processing complete: {total_count} occurrences found in {processing_time:.2f} seconds")
+            print(f"Results saved to {output_pdf}")
+            print(f"Log saved to {log_path}")
+    else:
+        # Process all PDFs in the folder
+        process_all_pdfs(target_file=args.targets, max_workers=args.cores, dpi=args.dpi)
