@@ -239,8 +239,12 @@ def process_pdf_page(args):
             # Store all unique variants
             target_variants[i] = list(set(variants))
         
-        # SIMPLIFIED PREPROCESSING: FILTER GREY FIRST, THEN USE NO_LINES_CLEANED APPROACH
-        print(f"Page {page_num+1}: Filtering grey elements and cleaning for better text detection...")
+        # ENHANCED PREPROCESSING: FILTER GREY, REMOVE LINES, APPLY NOISE REDUCTION
+        print(f"Page {page_num+1}: Filtering grey elements and cleaning with noise reduction...")
+
+        # Get the page dimensions from the PDF directly
+        page_width = page.rect.width
+        page_height = page.rect.height
 
         # Render the page with RGB color
         pix = page.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72), alpha=False)
@@ -255,7 +259,7 @@ def process_pdf_page(args):
             img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 4)
             img_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
 
-        # Extract filename from path for output images
+        # Extract filename for output image
         base_filename = os.path.splitext(os.path.basename(doc_path))[0]
 
         # STEP 1: FILTER GREY - Remove all pixels with RGB values >= 128,128,128
@@ -275,16 +279,18 @@ def process_pdf_page(args):
         # STEP 2: CONVERT TO GRAYSCALE
         gray = cv2.cvtColor(filtered_img, cv2.COLOR_RGB2GRAY)
 
-        # STEP 3: LINE REMOVAL - Remove horizontal and vertical lines
-        # Create a copy for line removal
+        # STEP 3: LINE REMOVAL - Remove long horizontal and vertical lines
+        # Create a working copy
         img_no_lines = gray.copy()
 
-        # Detect and remove horizontal lines
-        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
+        # Detect and remove LONG horizontal lines only
+        # Use a longer kernel to target only long horizontal lines
+        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
         horizontal_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
 
-        # Detect and remove vertical lines
-        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 25))
+        # Detect and remove LONG vertical lines only
+        # Use a longer kernel to target only long vertical lines
+        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
         vertical_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
 
         # Combine horizontal and vertical lines
@@ -293,15 +299,75 @@ def process_pdf_page(args):
         # Remove lines from the image (set to white)
         img_no_lines[lines > 0] = 255
 
-        # STEP 4: CLEAN UP THE NO-LINES IMAGE
-        # Apply light morphological opening to remove small noise
+        # STEP 4: APPLY NOISE REDUCTION TECHNIQUES
+
+        # 4.1: Apply bilateral filter to reduce noise while preserving edges
+        # This is good for preserving text edges while smoothing noise
+        bilateral_filtered = cv2.bilateralFilter(img_no_lines, d=5, sigmaColor=75, sigmaSpace=75)
+
+        # 4.2: Apply non-local means denoising for high-quality noise removal
+        # This algorithm is particularly good for document images
+        denoised = cv2.fastNlMeansDenoising(bilateral_filtered, h=10, templateWindowSize=7, searchWindowSize=21)
+
+        # 4.3: Apply mild median blur to remove salt-and-pepper noise
+        # Small kernel size (3) to avoid blurring text
+        median_filtered = cv2.medianBlur(denoised, 3)
+
+        # STEP 5: CLEAN UP THE IMAGE
+        # Apply very light morphological opening to remove small noise
         kernel = np.ones((2, 2), np.uint8)
-        no_lines_cleaned = cv2.morphologyEx(img_no_lines, cv2.MORPH_OPEN, kernel, iterations=1)
-        
-        # Create a collection of processed images for OCR - only using the no_lines_cleaned version
+        cleaned = cv2.morphologyEx(median_filtered, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        # STEP 6: ENHANCE CONTRAST FOR BETTER TEXT READABILITY
+        # Apply contrast limited adaptive histogram equalization (CLAHE)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(cleaned)
+
+        # Create output directory
+        os.makedirs('String_match/filtered_img', exist_ok=True)
+
+        # STEP 7: SAVE AS PDF
+        pdf_path = f"String_match/filtered_img/{base_filename}_page{page_num+1}_filtered.pdf"
+
+        # Ensure the output directory exists
+        os.makedirs('String_match/filtered_img', exist_ok=True)
+
+        try:
+            # Method 1: Use pymupdf (fitz) to create the PDF
+            output_pdf = fitz.open()
+            pdf_page = output_pdf.new_page(width=page_width, height=page_height)
+            
+            # Save enhanced image as temporary PNG file
+            temp_png_path = f"String_match/filtered_img/{base_filename}_page{page_num+1}_temp.png"
+            cv2.imwrite(temp_png_path, enhanced)
+            
+            # Insert the image using file path (more reliable than streams)
+            img_rect = fitz.Rect(0, 0, page_width, page_height)
+            pdf_page.insert_image(img_rect, filename=temp_png_path)
+            
+            # Save and close the PDF
+            output_pdf.save(pdf_path)
+            output_pdf.close()
+            
+            # Remove temporary file
+            try:
+                os.remove(temp_png_path)
+            except:
+                pass
+            
+            print(f"Page {page_num+1}: Saved filtered PDF to {pdf_path}")
+            
+        except Exception as e:
+            print(f"Error saving PDF with PyMuPDF: {e}")
+            
+            # Fallback method: Use PIL to save as PNG if PDF fails
+            fallback_png_path = f"String_match/filtered_img/{base_filename}_page{page_num+1}_filtered.png"
+            cv2.imwrite(fallback_png_path, enhanced)
+            print(f"Page {page_num+1}: Saved fallback PNG to {fallback_png_path}")
+
+        # Create a collection of processed images for OCR
         filtered_images = [
-            # Only use the no_lines_cleaned version as requested
-            ("no_lines_cleaned", no_lines_cleaned)
+            ("processed", enhanced)
         ]
 
         # Process the filtered image with OCR

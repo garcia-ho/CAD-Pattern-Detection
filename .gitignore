@@ -4,6 +4,7 @@ input_target/
 output_CAD/
 String_match/input_pdf
 String_match/output
+String_match/filtered_img
 
 # Python bytecode
 __pycache__/
