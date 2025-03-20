@@ -1,11 +1,8 @@
-Consolidated Pattern Detection Report - 2025-03-20 15:29:47.971325
+Consolidated Pattern Detection Report - 2025-03-20 16:21:44.431085
 Total images processed: 1
 
-Image: testA.png
-Processing time: 136.78 seconds
-Total detections: 191
-  2way_EO: 60 occurrences
-  DRB: 40 occurrences
-  Gate: 28 occurrences
-  Globe: 63 occurrences
+Image: testA.pdf
+Processing time: 339.45 seconds
+Total detections: 3
+  Globe: 3 occurrences
 

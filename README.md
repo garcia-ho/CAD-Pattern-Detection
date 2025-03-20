@@ -41,14 +41,23 @@ python Pattern_match/pattern_detect.py -i Pattern_match/input_CAD -t Pattern_mat
 <img src="readme_png/Valve_det.png" width="500" alt="Pattern detection example">
 
 
-### Options:
--i, --image: Input image file or directory (default: Pattern_match/input_CAD)
--t, --templates: Directory containing template images (default: Pattern_match/input_target)
--o, --output: Directory to save results (default: Pattern_match/output_CAD)
---threshold: Matching threshold (0-1), higher values mean stricter matching (default: 0.53)
---workers: Number of worker threads for parallel processing (default: 4)
---overlap: Maximum allowed overlap between matches (default: 0.3)
---alpha: Transparency level for pattern highlighting (default: 0.3)
+### Command-Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-i, --image` | Input image or PDF file/directory | `Pattern_match/input_CAD` |
+| `-t, --templates` | Directory containing template images | `Pattern_match/input_target` |
+| `-o, --output` | Directory to save results | `Pattern_match/output_CAD` |
+| `--threshold` | Matching threshold (0-1); higher values mean stricter matching | `0.53` |
+| `--min-scale` | Minimum scale to search | `0.01` |
+| `--max-scale` | Maximum scale to search | `0.5` |
+| `--scale-steps` | Number of scale steps between min and max | `20` |
+| `--no-rotations` | Disable rotation detection (only detect at 0 degrees) | `False` |
+| `--overlap` | Maximum overlap threshold for nearby patterns (0-1) | `0.3` |
+| `--min-separation` | Minimum separation between distinct matches in pixels | `10` |
+| `--alpha` | Transparency level for pattern highlighting (0-1) | `0.3` |
+| `--workers` | Number of worker threads for parallel processing | `4` |
+| `--dpi` | DPI for PDF processing (higher = better quality but slower) | `500` |
 
 
 2. Text Recognition
