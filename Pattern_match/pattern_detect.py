@@ -7,6 +7,8 @@ from functools import partial
 from datetime import datetime
 import glob
 from pathlib import Path
+import csv
+from collections import defaultdict
 
 class MultiPatternDetector:
     def __init__(self, threshold=0.7, scale_range=(0.2, 2.0), scale_steps=10, rotations=None, 
@@ -203,11 +205,15 @@ class MultiPatternDetector:
                     if local_maxima:
                         print(f"Found {len(local_maxima)} matches at angle={angle}, scale={scale:.2f}, template={template_id}")
             
-            # Apply non-maximum suppression to remove duplicates, grouping by template_id
-            filtered_detections = self._non_max_suppression_by_template(all_detections, 
+            # Apply non-maximum suppression to remove duplicates, first by template
+            filtered_by_template = self._non_max_suppression_by_template(all_detections, 
                                                                       overlap_threshold=self.overlap_threshold)
         
-        return filtered_detections
+        # Then apply cross-template NMS to ensure only the best match is kept at each location
+        final_detections = self._non_max_suppression_across_templates(filtered_by_template,
+                                                                   overlap_threshold=self.overlap_threshold)
+    
+        return final_detections
     
     def _find_local_maxima(self, result_matrix, threshold, min_distance=10):
         """
@@ -347,13 +353,90 @@ class MultiPatternDetector:
         
         return filtered_detections
     
-    def highlight_matches(self, image, detections, alpha=0.4):
+    def _non_max_suppression_across_templates(self, detections, overlap_threshold=0.7):
+        """
+        Apply non-maximum suppression across all templates to keep only the highest-scoring detection
+        when multiple templates overlap significantly.
+        
+        Args:
+            detections: List of (template_id, x, y, w, h, angle, score)
+            overlap_threshold: Maximum allowed overlap
+            
+        Returns:
+            Filtered list of detections with no significant overlaps
+        """
+        if not detections:
+            return []
+            
+        # First apply template-specific NMS to reduce candidates
+        detections = self._non_max_suppression_by_template(detections, overlap_threshold)
+        
+        # Convert to format needed for NMS
+        boxes = []
+        for i, (template_id, x, y, w, h, angle, score) in enumerate(detections):
+            boxes.append([x, y, x + w, y + h, angle, score, i])  # i is the index to the original detection
+        
+        if not boxes:
+            return []
+            
+        boxes = np.array(boxes)
+        
+        # Get coordinates
+        x1 = boxes[:, 0]
+        y1 = boxes[:, 1]
+        x2 = boxes[:, 2]
+        y2 = boxes[:, 3]
+        angles = boxes[:, 4]
+        scores = boxes[:, 5]
+        indices = boxes[:, 6].astype(int)
+        
+        # Compute areas
+        areas = (x2 - x1) * (y2 - y1)
+        
+        # Sort by score
+        order = np.argsort(-scores)  # Negative scores for descending order
+        
+        keep = []
+        while order.size > 0:
+            i = order[0]
+            keep.append(i)
+            
+            # Exit if this is the last box
+            if order.size == 1:
+                break
+                
+            # Compute IoU with remaining boxes
+            xx1 = np.maximum(x1[i], x1[order[1:]])
+            yy1 = np.maximum(y1[i], y1[order[1:]])
+            xx2 = np.minimum(x2[i], x2[order[1:]])
+            yy2 = np.minimum(y2[i], y2[order[1:]])
+            
+            # Width and height of intersection
+            w = np.maximum(0, xx2 - xx1)
+            h = np.maximum(0, yy2 - yy1)
+            
+            # IoU
+            intersection = w * h
+            union = areas[i] + areas[order[1:]] - intersection
+            iou = intersection / (union + 1e-6)
+            
+            # Here's the key difference: when checking across templates, we're more strict
+            # and only keep detections with low overlap, regardless of template ID or angle
+            inds = np.where(iou <= overlap_threshold)[0]
+            
+            order = order[inds + 1]
+        
+        # Return filtered detections
+        return [detections[indices[i]] for i in keep]
+    
+    def highlight_matches(self, image, detections, template_names=None, alpha=0.4):
         """
         Highlight the matches in the image with semi-transparent colored overlays.
         
         Args:
             image: Input image
             detections: List of (template_id, x, y, w, h, angle, score)
+            template_names: Dictionary mapping template IDs to names (optional)
             alpha: Transparency level (0-1), where 1 is opaque
             
         Returns:
@@ -375,6 +458,15 @@ class MultiPatternDetector:
             # Get color for this template
             bgr_color = tuple(int(c * 255) for c in template_colors[template_id])
             
+            # Use template name if available
+            if template_names and template_id in template_names:
+                label_text = f"{template_names[template_id]}"
+            else:
+                label_text = f"ID:{template_id}"
+            
+            # Add score to label
+            label = f"{label_text} ({score:.2f})"
+            
             if angle % 180 == 0:  # For 0 and 180 degrees
                 # Draw filled rectangle on overlay
                 cv2.rectangle(overlay, (x, y), (x + w, y + h), bgr_color, -1)  # Filled
@@ -382,8 +474,7 @@ class MultiPatternDetector:
                 # Draw rectangle outline on result
                 cv2.rectangle(result, (x, y), (x + w, y + h), bgr_color, 2)
                 
-                # Add template ID and confidence
-                label = f"ID:{template_id} ({score:.2f})"
+                # Add template name/ID and confidence
                 cv2.putText(result, label, (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 
                            0.6, bgr_color, 2)
             else:
@@ -398,8 +489,7 @@ class MultiPatternDetector:
                 # Draw polygon outline on result
                 cv2.drawContours(result, [box], 0, bgr_color, 2)
                 
-                # Add template ID and confidence
-                label = f"ID:{template_id} ({score:.2f})"
+                # Add template name/ID and confidence
                 cv2.putText(result, label, (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 
                            0.6, bgr_color, 2)
         
@@ -442,10 +532,11 @@ def load_templates(template_dir):
         template_dir: Directory containing template images
         
     Returns:
-        List of (template_image, template_id) pairs
+        Tuple of (templates list, template_names dictionary)
     """
     templates = []
     template_files = []
+    template_names = {}
     
     # Support multiple image formats
     for ext in ['*.png', '*.jpg', '*.jpeg', '*.tif', '*.tiff']:
@@ -460,49 +551,119 @@ def load_templates(template_dir):
             print(f"Warning: Could not load template {file_path}")
             continue
         
-        # Use filename without extension as ID if possible
-        try:
-            template_id = int(os.path.splitext(os.path.basename(file_path))[0])
-        except ValueError:
-            template_id = i + 1  # 1-based IDs
+        # Use numeric ID for internal processing
+        template_id = i + 1  # Use 1-based IDs
+        
+        # Get filename without extension for reports
+        template_name = os.path.splitext(os.path.basename(file_path))[0]
+        template_names[template_id] = template_name
             
         templates.append((template, template_id))
-        print(f"Loaded template ID {template_id}: {file_path}")
+        print(f"Loaded template {template_name} (ID {template_id}): {file_path}")
     
-    return templates
+    return templates, template_names
 
-def generate_detection_report(detections, image_path, output_file="Pattern_match/detection_result.txt"):
+def generate_csv_report(all_detection_results, template_names_map, output_file="Pattern_match/valve_reports.csv"):
     """
-    Generate a report of detected patterns.
+    Generate a CSV report summarizing the number of occurrences of each template in each image.
     
     Args:
-        detections: List of (template_id, x, y, w, h, angle, score)
-        image_path: Path to the input image
-        output_file: Path to the output report file
+        all_detection_results: Dictionary mapping image paths to lists of detections
+        template_names_map: Dictionary mapping template IDs to template names
+        output_file: Path to output CSV file
     """
-    with open(output_file, 'w') as f:
-        f.write(f"Detection Report - {datetime.now()}\n")
-        f.write(f"Image: {image_path}\n")
-        f.write(f"Number of detections: {len(detections)}\n\n")
+    # Get all unique template IDs across all images
+    all_template_ids = set()
+    for detections in all_detection_results.values():
+        template_ids = set(d[0] for d in detections)
+        all_template_ids.update(template_ids)
+    
+    # Sort template IDs for consistent output
+    all_template_ids = sorted(all_template_ids)
+    
+    # Prepare CSV header with template names instead of IDs
+    header = ["Image"]
+    for tid in all_template_ids:
+        template_name = template_names_map.get(tid, f"Template_{tid}")
+        header.append(template_name)
+    
+    # Count occurrences of each template in each image
+    rows = []
+    for image_path, detections in all_detection_results.items():
+        # Use the file name without extension as the image identifier
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
         
-        # Group by template ID
-        detections_by_template = {}
+        # Count occurrences of each template
+        template_counts = defaultdict(int)
         for detection in detections:
             template_id = detection[0]
-            if template_id not in detections_by_template:
-                detections_by_template[template_id] = []
-            detections_by_template[template_id].append(detection)
+            template_counts[template_id] += 1
         
-        # Report for each template
-        for template_id, template_detections in sorted(detections_by_template.items()):
-            f.write(f"Template ID {template_id}: {len(template_detections)} instances\n")
-            for i, (tid, x, y, w, h, angle, score) in enumerate(template_detections):
-                f.write(f"  {i+1}. Position: ({x}, {y}), Size: {w}x{h}, Angle: {angle}°, Confidence: {score:.3f}\n")
+        # Create row with image name and counts for each template
+        row = [image_name]
+        for template_id in all_template_ids:
+            row.append(template_counts.get(template_id, 0))
+        
+        rows.append(row)
+    
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    # Write CSV file
+    with open(output_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+    
+    print(f"Valve report saved to {output_file}")
+
+def generate_text_report(all_detection_results, processing_times, template_names_map, output_file="Pattern_match/report.txt"):
+    """
+    Generate a consolidated log file for all processed images without location details.
+    
+    Args:
+        all_detection_results: Dictionary mapping image paths to lists of detections
+        processing_times: Dictionary mapping image paths to processing times
+        template_names_map: Dictionary mapping template IDs to template names
+        output_file: Path to output log file
+    """
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    with open(output_file, 'w') as f:
+        f.write(f"Consolidated Pattern Detection Report - {datetime.now()}\n")
+        f.write(f"Total images processed: {len(all_detection_results)}\n\n")
+        
+        # Write summary for each image
+        for image_path in sorted(all_detection_results.keys()):
+            detections = all_detection_results[image_path]
+            time_elapsed = processing_times.get(image_path, 0)
+            
+            image_name = os.path.basename(image_path)
+            
+            f.write(f"Image: {image_name}\n")
+            f.write(f"Processing time: {time_elapsed:.2f} seconds\n")
+            
+            # Count detections by template
+            template_counts = defaultdict(int)
+            for detection in detections:
+                template_id = detection[0]
+                template_counts[template_id] += 1
+            
+            # Total detections
+            total_detections = sum(template_counts.values())
+            f.write(f"Total detections: {total_detections}\n")
+            
+            # Detections by template, using template names
+            for template_id, count in sorted(template_counts.items()):
+                template_name = template_names_map.get(template_id, f"Template_{template_id}")
+                f.write(f"  {template_name}: {count} occurrences\n")
+            
             f.write("\n")
     
-    print(f"Detection report saved to {output_file}")
+    print(f"Consolidated report saved to {output_file}")
 
-def process_image(image_path, template_dir, output_dir, detector, args):
+def process_image(image_path, template_dir, output_dir, detector, args, template_names=None):
     """
     Process a single image with all templates.
     
@@ -512,6 +673,7 @@ def process_image(image_path, template_dir, output_dir, detector, args):
         output_dir: Directory to save results
         detector: MultiPatternDetector instance
         args: Command line arguments
+        template_names: Dictionary mapping template IDs to names (optional)
         
     Returns:
         Tuple of (detections, visualization)
@@ -527,8 +689,14 @@ def process_image(image_path, template_dir, output_dir, detector, args):
         print(f"Error: Could not load image {image_path}")
         return None, None
     
-    # Load templates
-    templates = load_templates(template_dir)
+    # Load templates if not provided
+    templates = None
+    if template_names is None:
+        templates, template_names = load_templates(template_dir)
+    
+    if templates is None:
+        templates, _ = load_templates(template_dir)
+    
     if not templates:
         print(f"Error: No templates found in {template_dir}")
         return None, None
@@ -542,8 +710,8 @@ def process_image(image_path, template_dir, output_dir, detector, args):
     
     print(f"Found {len(detections)} pattern instances in {elapsed:.2f} seconds")
     
-    # Generate visualization
-    visualization = detector.highlight_matches(image, detections)
+    # Generate visualization with template names
+    visualization = detector.highlight_matches(image, detections, template_names, args.alpha)
     
     # Draw summary information
     summary_text = f"Found {len(detections)} instances of {len(set(d[0] for d in detections))} patterns"
@@ -567,7 +735,26 @@ def process_image(image_path, template_dir, output_dir, detector, args):
     
     # Generate report
     report_path = os.path.join(output_dir, f"{image_name}_report.txt")
-    generate_detection_report(detections, image_path, report_path)
+    with open(report_path, 'w') as f:
+        f.write(f"Detection Report - {datetime.now()}\n")
+        f.write(f"Image: {image_path}\n")
+        f.write(f"Number of detections: {len(detections)}\n\n")
+        
+        # Group by template ID
+        detections_by_template = {}
+        for detection in detections:
+            template_id = detection[0]
+            if template_id not in detections_by_template:
+                detections_by_template[template_id] = []
+            detections_by_template[template_id].append(detection)
+        
+        # Report for each template using names
+        for template_id, template_detections in sorted(detections_by_template.items()):
+            template_name = template_names.get(template_id, f"Template {template_id}")
+            f.write(f"{template_name}: {len(template_detections)} instances\n")
+            for i, (tid, x, y, w, h, angle, score) in enumerate(template_detections):
+                f.write(f"  {i+1}. Position: ({x}, {y}), Size: {w}x{h}, Angle: {angle}°, Confidence: {score:.3f}\n")
+            f.write("\n")
     
     return detections, visualization
 
@@ -587,7 +774,7 @@ def main():
                         help='Directory to save results')
     
     # Detection parameters
-    parser.add_argument('--threshold', type=float, default=0.55,
+    parser.add_argument('--threshold', type=float, default=0.52,
                         help='Matching threshold (0-1), higher values mean stricter matching')
     parser.add_argument('--min-scale', type=float, default=0.01,
                         help='Minimum scale to search')
@@ -597,7 +784,7 @@ def main():
                         help='Number of scale steps between min and max')
     parser.add_argument('--no-rotations', action='store_true',
                         help='Disable rotation detection (only detect at 0 degrees)')
-    parser.add_argument('--overlap', type=float, default=0.7,
+    parser.add_argument('--overlap', type=float, default=0.3,
                         help='Maximum overlap threshold for nearby patterns (0-1)')
     parser.add_argument('--min-separation', type=int, default=10,
                         help='Minimum separation between distinct matches in pixels')
@@ -613,7 +800,7 @@ def main():
     
     # Set default image path if not provided
     if not args.image:
-        args.image = 'input'
+        args.image = 'Pattern_match/input_CAD'
         print(f"No input specified, using default: {args.image}")
     
     # Determine rotations to use
@@ -630,10 +817,24 @@ def main():
         min_separation=args.min_separation
     )
     
+    # Load templates once to get template names
+    _, template_names = load_templates(args.templates)
+    
+    # Dictionaries to store results for all images
+    all_detection_results = {}
+    all_processing_times = {}
+    
     # Process single image or directory
     if os.path.isfile(args.image):
         # Process single image
-        process_image(args.image, args.templates, args.output, detector, args)
+        start_time = datetime.now()
+        detections, _ = process_image(args.image, args.templates, args.output, detector, args, template_names)
+        elapsed = (datetime.now() - start_time).total_seconds()
+        
+        if detections is not None:
+            all_detection_results[args.image] = detections
+            all_processing_times[args.image] = elapsed
+    
     elif os.path.isdir(args.image):
         # Process all images in directory
         image_files = []
@@ -650,25 +851,50 @@ def main():
         if args.workers > 1 and len(image_files) > 1:
             with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
                 process_func = partial(process_image, template_dir=args.templates, 
-                                      output_dir=args.output, detector=detector, args=args)
-                futures = {executor.submit(process_func, image_path): image_path 
-                          for image_path in image_files}
+                                      output_dir=args.output, detector=detector, 
+                                      args=args, template_names=template_names)
                 
-                for future in concurrent.futures.as_completed(futures):
-                    image_path = futures[future]
+                # Submit all tasks
+                future_to_image = {}
+                for image_path in image_files:
+                    future = executor.submit(process_func, image_path)
+                    future_to_image[future] = image_path
+                
+                # Collect results as they complete
+                for future in concurrent.futures.as_completed(future_to_image):
+                    image_path = future_to_image[future]
                     try:
-                        future.result()
+                        detections, _ = future.result()
+                        if detections is not None:
+                            all_detection_results[image_path] = detections
+                            # Approximate the processing time from the result output
+                            # (In parallel processing, we don't have precise times)
+                            all_processing_times[image_path] = 0
                     except Exception as e:
                         print(f"Error processing {image_path}: {e}")
         else:
             # Process sequentially
             for image_path in image_files:
                 try:
-                    process_image(image_path, args.templates, args.output, detector, args)
+                    start_time = datetime.now()
+                    detections, _ = process_image(image_path, args.templates, args.output, 
+                                                detector, args, template_names)
+                    elapsed = (datetime.now() - start_time).total_seconds()
+                    
+                    if detections is not None:
+                        all_detection_results[image_path] = detections
+                        all_processing_times[image_path] = elapsed
                 except Exception as e:
                     print(f"Error processing {image_path}: {e}")
     else:
         print(f"Error: {args.image} is not a valid file or directory")
+        return
+    
+    # Generate CSV and text reports with template names if we have results
+    if all_detection_results:
+        generate_csv_report(all_detection_results, template_names, "Pattern_match/valve_reports.csv")
+        generate_text_report(all_detection_results, all_processing_times, template_names, "Pattern_match/report.txt")
+        print(f"Processed {len(all_detection_results)} images. Generated summary reports.")
 
 if __name__ == "__main__":
     main()
