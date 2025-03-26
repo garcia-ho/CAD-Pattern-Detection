@@ -6,7 +6,7 @@ This repository provides a comprehensive toolkit for CAD pattern detection and t
 ## Features
 
 ### YOLO-Based Pattern Detection
-- Detects engineering components in CAD drawings and P&IDs using YOLOv8
+- Detects engineering components in CAD drawings and P&IDs using YOLOv11
 - Optimized for detecting multiple component types simultaneously
 - Colorful annotations with unique colors for each component type
 - High-resolution PDF processing with automatic tiling for large documents
@@ -16,9 +16,10 @@ This repository provides a comprehensive toolkit for CAD pattern detection and t
 
 ### Text Recognition
 - OCR processing for text extraction from PDF documents
-- String matching capability for finding specific text
-- Adds OCR layer to PDFs for improved searchability
-- Generates detailed reports of finding
+- String matching capability for finding specific text in engineering documents
+- Highlights text occurrences with distinct colors for easy visualization
+- Processes high-resolution images in overlapping patches for optimal text detection
+- Generates CSV reports of text occurrence counts
 
 
 
@@ -92,18 +93,27 @@ python Pattern_match/main.py --input-cad Pattern_match/input_CAD --processed-dir
 
 -------------------
 
-## 2. Text Recognition
+## 2. Text Recognition and Matching
+The text recognition process consists of two main stages:
+
+### 1. Preprocessing:
+
+- Converts PDFs to high-resolution images
+- Enhances text visibility with advanced filtering techniques
+- Removes noise and optimizes contrast for better OCR results
+- Text Detection and Matching:
+
+### 2. Splits large images into overlapping patches for detailed text detection
+### 3. Uses PaddleOCR to detect text in each patch
+- Matches detected text against target words from a specified list
+- Highlights and annotates matched words in the output images
+- Generates detailed CSV reports with occurrence counts
 
 ```bash
 cd CAD_matching
-
 python String_match/main_text_det.py
 ```
 
-- Use --workers parameter matching your CPU core count for optimal performance
-- Adjust --threshold between 0.5-0.7 for best detection accuracy
-- For detecting closely placed patterns, use lower --overlap values (0.2-0.3)
-- Process large batches of files overnight using cron or task scheduler
 
 
 <img src="readme_png/text_rec.png" width="500" alt="Pattern detection example">
