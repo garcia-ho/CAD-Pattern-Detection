@@ -1,12 +1,16 @@
 # Ignore input and output directories
 input_CAD/
-input_target/
+input_image/
 output_CAD/
 String_match/input_pdf
 String_match/output
 String_match/filtered_img
 
+# YOLO
+Pattern_match/datasets
+Pattern_match/runs
 seg_cad
+
 # Python bytecode
 __pycache__/
 *.py[cod]

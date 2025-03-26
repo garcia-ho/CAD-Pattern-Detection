@@ -1,8 +1,0 @@
-Consolidated Pattern Detection Report - 2025-03-20 16:21:44.431085
-Total images processed: 1
-
-Image: testA.pdf
-Processing time: 339.45 seconds
-Total detections: 3
-  Globe: 3 occurrences
-
