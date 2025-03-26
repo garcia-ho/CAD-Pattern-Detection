@@ -4,14 +4,13 @@ import os
 import re
 import fitz  # PyMuPDF for PDF handling
 import cv2
-import pytesseract
 import numpy as np
 from PIL import Image
 
-def process_pdf_page(args):
+
+def process_pdf_page_with_paddle(args):
     """
-    Process a single PDF page to find occurrences of target strings using OCR only.
-    For single-page PDFs, outputs a single filtered PDF with the same name.
+    Process a single PDF page using PaddleOCR for better text detection.
     
     Args:
         args (tuple): (doc_path, page_num, target_strings, dpi, sensitivity)
@@ -19,6 +18,8 @@ def process_pdf_page(args):
     Returns:
         dict: Contains page number, found boxes, and processing information
     """
+    from paddleocr import PaddleOCR
+    
     if len(args) == 5:
         doc_path, page_num, target_strings, dpi, sensitivity = args
     else:
@@ -130,12 +131,10 @@ def process_pdf_page(args):
         img_no_lines = gray.copy()
 
         # Detect and remove LONG horizontal lines only
-        # Use a longer kernel to target only long horizontal lines
         horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
         horizontal_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
 
         # Detect and remove LONG vertical lines only
-        # Use a longer kernel to target only long vertical lines
         vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
         vertical_lines = cv2.morphologyEx(255 - gray, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
 
@@ -146,14 +145,8 @@ def process_pdf_page(args):
         img_no_lines[lines > 0] = 255
 
         # STEP 4: APPLY NOISE REDUCTION TECHNIQUES
-
-        # 4.1: Apply bilateral filter to reduce noise while preserving edges
         bilateral_filtered = cv2.bilateralFilter(img_no_lines, d=5, sigmaColor=75, sigmaSpace=75)
-
-        # 4.2: Apply non-local means denoising for high-quality noise removal
         denoised = cv2.fastNlMeansDenoising(bilateral_filtered, h=10, templateWindowSize=7, searchWindowSize=21)
-
-        # 4.3: Apply mild median blur to remove salt-and-pepper noise
         median_filtered = cv2.medianBlur(denoised, 3)
 
         # STEP 5: CLEAN UP THE IMAGE
@@ -167,9 +160,118 @@ def process_pdf_page(args):
         # Create output directory
         os.makedirs('String_match/filtered_img', exist_ok=True)
 
-        # STEP 7: For single-page PDFs, use the same name as the input PDF
-        pdf_path = f"String_match/filtered_img/{base_filename}.pdf"
+        # Save processed image for OCR
+        temp_img_path = f"String_match/filtered_img/{base_filename}_temp.jpg"
+        cv2.imwrite(temp_img_path, enhanced)
 
+        # INITIALIZE PADDLE OCR
+        # Use different models based on the content type
+        ocr_engine = PaddleOCR(
+            use_angle_cls=True,  # Enable rotation detection
+            lang="en",           # English language
+            show_log=False,      # Don't show log
+            use_gpu=False        # Can set to True if GPU available
+        )
+        
+        # Run PaddleOCR detection and recognition
+        print("Running PaddleOCR detection...")
+        paddle_results = ocr_engine.ocr(temp_img_path, cls=True)
+        
+        if paddle_results is not None and len(paddle_results) > 0:
+            # Process OCR results
+            for line in paddle_results[0]:  # First page results
+                # Each line has [[points], (text, confidence)]
+                box_points = line[0]  # 4 points of the detection box
+                text, confidence = line[1]  # Text and confidence
+                
+                # Skip low confidence detections
+                min_confidence = max(0.5, 0.7 - (sensitivity * 0.05))
+                
+                # Lower threshold for VCD
+                if "VCD" in text.upper() or "VC D" in text.upper():
+                    min_confidence = max(0.3, 0.5 - (sensitivity * 0.05))
+                    
+                if confidence < min_confidence:
+                    continue
+                
+                # Calculate bounding box coordinates
+                x_coords = [point[0] for point in box_points]
+                y_coords = [point[1] for point in box_points]
+                
+                # Get bounding box in x, y, w, h format
+                x = min(x_coords)
+                y = min(y_coords)
+                w = max(x_coords) - x
+                h = max(y_coords) - y
+                
+                # Skip extremely small or large boxes
+                if w < 5 or h < 5:
+                    continue
+                    
+                if w > enhanced.shape[1] * 0.9 or h > enhanced.shape[0] * 0.9:
+                    continue
+                
+                # Scale coordinates back to original PDF size
+                scale_to_pdf = 72 / dpi
+                pdf_x = x * scale_to_pdf
+                pdf_y = y * scale_to_pdf
+                pdf_w = w * scale_to_pdf
+                pdf_h = h * scale_to_pdf
+                
+                # Normalize detected text
+                normalized_text = text.strip().upper()
+                cleaned_text = re.sub(r'[^\w\s\-\.]', '', normalized_text)
+                
+                # Check against target strings
+                for target_idx, target_upper in enumerate(target_strings_upper):
+                    target_string = target_strings[target_idx]
+                    curr_variants = target_variants.get(target_idx, [target_upper])
+                    
+                    for variant in curr_variants:
+                        found_match = False
+                        match_type = ""
+                        
+                        # Check different match types
+                        if variant == normalized_text or variant == cleaned_text:
+                            found_match = True
+                            match_type = "exact"
+                        
+                        elif variant in normalized_text.split() or variant in cleaned_text.split():
+                            found_match = True
+                            match_type = "word"
+                        
+                        elif variant in normalized_text or variant in cleaned_text:
+                            found_match = True
+                            match_type = "contained"
+                        
+                        # Special case for VCD
+                        if target_string.upper() == 'VCD' and not found_match:
+                            if (normalized_text.startswith('V') and 
+                                ('C' in normalized_text or '0' in normalized_text or 'O' in normalized_text) and
+                                ('D' in normalized_text or 'O' in normalized_text or '0' in normalized_text)):
+                                found_match = True
+                                match_type = "vcd_special"
+                        
+                        # If found a match, add to results
+                        if found_match:
+                            all_boxes.append({
+                                'x': pdf_x, 'y': pdf_y, 'w': pdf_w, 'h': pdf_h,
+                                'text': text, 'conf': float(confidence * 100),
+                                'target': target_string,
+                                'source': "paddleocr",
+                                'match_type': match_type,
+                                'variant': variant
+                            })
+                            break
+        
+        # Clean up temporary image
+        try:
+            os.remove(temp_img_path)
+        except:
+            pass
+        
+        # SAVE PDF OUTPUT
+        pdf_path = f"String_match/filtered_img/{base_filename}.pdf"
         try:
             # Convert enhanced image to JPEG with high compression first
             encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
@@ -220,215 +322,13 @@ def process_pdf_page(args):
             fallback_jpg_path = f"String_match/filtered_img/{base_filename}_filtered.jpg" 
             cv2.imwrite(fallback_jpg_path, enhanced, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
             print(f"Saved fallback JPEG to {fallback_jpg_path}")
-
-        # Create a collection of processed images for OCR
-        filtered_images = [
-            ("processed", enhanced)
-        ]
-
-        # Process the filtered image with OCR
-        for filter_name, filtered_img in filtered_images:
-            # Convert to PIL for OCR
-            pil_img = Image.fromarray(filtered_img)
-            
-            # OCR configs for different text patterns
-            configs = [
-                # Standard config - for normal text blocks
-                '--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
-                
-                # Sparse text config - for CAD drawings with isolated text
-                '--oem 3 --psm 11 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
-                
-                # Single line config - for text in a single line
-                '--oem 3 --psm 7 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -./()[]{}#"',
-                
-                # Single word config - especially for small text like 'VCD'
-                '--oem 3 --psm 8 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"',
-                
-                # Single character config - for isolated letters/digits
-                '--oem 3 --psm 10 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"'
-            ]
-            
-            # Process with each OCR config
-            for config_idx, config in enumerate(configs):
-                try:
-                    # Get OCR data with bounding boxes
-                    ocr_data = pytesseract.image_to_data(pil_img, config=config, output_type=pytesseract.Output.DICT)
-                    
-                    # Process OCR results
-                    for i, text in enumerate(ocr_data['text']):
-                        # Skip empty text
-                        if not text.strip():
-                            continue
-                        
-                        # Apply confidence threshold based on sensitivity
-                        min_confidence = max(25, 50 - (sensitivity * 5))
-                        
-                        # Lower confidence threshold for VCD detection
-                        if text.upper() in ['VCD', 'V CD', 'VC D', 'VCO', 'VGD', 'VCD.', 'VCO.']:
-                            min_confidence = max(15, 25 - (sensitivity * 2))
-                            
-                        if ocr_data['conf'][i] < min_confidence:
-                            continue
-                        
-                        # Get bounding box
-                        x = ocr_data['left'][i]
-                        y = ocr_data['top'][i]
-                        w = ocr_data['width'][i]
-                        h = ocr_data['height'][i]
-                        conf = ocr_data['conf'][i]
-                        
-                        # For very small text detection (especially for 'VCD')
-                        if w < 10 or h < 10:
-                            if len(text) <= 3:  # Small words like 'VCD'
-                                # Allow small boxes for short text
-                                pass
-                            else:
-                                # Skip extremely small boxes for longer text
-                                continue
-                        
-                        # Skip extremely large boxes (likely page boundaries)
-                        if w > pil_img.width * 0.9 or h > pil_img.height * 0.9:
-                            continue
-                        
-                        # Scale coordinates back to original PDF size
-                        scale_to_pdf = 72 / dpi
-                        pdf_x = x * scale_to_pdf
-                        pdf_y = y * scale_to_pdf
-                        pdf_w = w * scale_to_pdf
-                        pdf_h = h * scale_to_pdf
-                        
-                        # Normalize text for matching
-                        normalized_text = text.strip().upper()
-                        
-                        # Clean text for matching
-                        cleaned_text = re.sub(r'[^\w\s\-\.]', '', normalized_text)
-                        
-                        # Check matches with each target
-                        for target_idx, target_upper in enumerate(target_strings_upper):
-                            target_string = target_strings[target_idx]
-                            curr_variants = target_variants.get(target_idx, [target_upper])
-                            
-                            # Special handling for short targets like VCD
-                            is_short_target = len(target_string) <= 3
-                            
-                            for variant in curr_variants:
-                                found_match = False
-                                match_type = ""
-                                
-                                # 1. EXACT MATCH
-                                if variant == normalized_text or variant == cleaned_text:
-                                    found_match = True
-                                    match_type = "exact"
-                                
-                                # 2. WORD MATCH
-                                elif variant in normalized_text.split() or variant in cleaned_text.split():
-                                    found_match = True
-                                    match_type = "word"
-                                
-                                # 3. CONTAINED MATCH
-                                elif variant in normalized_text or variant in cleaned_text:
-                                    found_match = True
-                                    match_type = "contained"
-                                
-                                # Special case for VCD - extremely permissive matching
-                                if target_string.upper() == 'VCD' and not found_match:
-                                    # Check for partial matches in small text boxes
-                                    if (normalized_text.startswith('V') and 
-                                        ('C' in normalized_text or '0' in normalized_text or 'O' in normalized_text) and
-                                        ('D' in normalized_text or 'O' in normalized_text or '0' in normalized_text)):
-                                        found_match = True
-                                        match_type = "vcd_special"
-                                
-                                # If found a match, add to results
-                                if found_match:
-                                    all_boxes.append({
-                                        'x': pdf_x, 'y': pdf_y, 'w': pdf_w, 'h': pdf_h,
-                                        'text': text, 'conf': conf,
-                                        'target': target_string,
-                                        'source': f"{filter_name}-cfg{config_idx}",
-                                        'match_type': match_type,
-                                        'variant': variant
-                                    })
-                                    break
-                except Exception as e:
-                    print(f"OCR error with config {config_idx} on filter {filter_name}: {e}")
-            
-            # For VCD detection specifically, use smaller sliding window approach
-            if any(t.upper() == 'VCD' for t in target_strings):
-                try:
-                    # Create multiple smaller windows to detect VCD
-                    img_height, img_width = filtered_img.shape
-                    window_size = min(50, img_width//10)  # Use smaller windows
-                    stride = window_size // 2
-                    
-                    # Only use this technique for reasonably sized images
-                    if img_width > 200 and img_height > 200:
-                        print("Using smaller detection windows for VCD detection...")
-                        
-                        for y in range(0, img_height - window_size, stride):
-                            for x in range(0, img_width - window_size, stride):
-                                # Extract window
-                                window = filtered_img[y:y+window_size, x:x+window_size]
-                                
-                                # Skip mostly white windows
-                                if np.mean(window) > 240:
-                                    continue
-                                
-                                # Convert to PIL for OCR
-                                window_pil = Image.fromarray(window)
-                                
-                                # Use special configs for VCD detection
-                                vcd_configs = [
-                                    '--oem 3 --psm 8 -c tessedit_char_whitelist="VCD"',
-                                    '--oem 3 --psm 10 -c tessedit_char_whitelist="VCD"'
-                                ]
-                                
-                                for config in vcd_configs:
-                                    # Direct text output to check for VCD
-                                    text = pytesseract.image_to_string(window_pil, config=config).strip().upper()
-                                    
-                                    if 'VCD' in text or 'V CD' in text or 'VC D' in text:
-                                        # Get more precise coordinates with image_to_data
-                                        ocr_data = pytesseract.image_to_data(window_pil, config=config, output_type=pytesseract.Output.DICT)
-                                        
-                                        for i, word in enumerate(ocr_data['text']):
-                                            if not word.strip():
-                                                continue
-                                                
-                                            if 'V' in word.upper() and ('C' in word.upper() or 'D' in word.upper()):
-                                                # Calculate coordinates in original image
-                                                wx = x + ocr_data['left'][i]
-                                                wy = y + ocr_data['top'][i]
-                                                ww = ocr_data['width'][i]
-                                                wh = ocr_data['height'][i]
-                                                
-                                                # Scale to PDF coordinates
-                                                scale_to_pdf = 72 / dpi
-                                                pdf_x = wx * scale_to_pdf
-                                                pdf_y = wy * scale_to_pdf
-                                                pdf_w = ww * scale_to_pdf
-                                                pdf_h = wh * scale_to_pdf
-                                                
-                                                # Add to boxes
-                                                all_boxes.append({
-                                                    'x': pdf_x, 'y': pdf_y, 'w': pdf_w, 'h': pdf_h,
-                                                    'text': 'VCD',
-                                                    'conf': ocr_data['conf'][i],
-                                                    'target': 'VCD',
-                                                    'source': 'sliding_window',
-                                                    'match_type': 'vcd_special',
-                                                    'variant': 'VCD'
-                                                })
-                except Exception as e:
-                    print(f"Error in sliding window VCD detection: {e}")
         
         # Close the document
         doc.close()
         
         print(f"Found {len(all_boxes)} potential matches before deduplication")
         
-        # DEDUPLICATION
+        # DEDUPLICATION (same as your current code)
         merged_boxes = []
         
         # Group boxes by target string
@@ -510,6 +410,8 @@ def process_pdf_page(args):
         
     except Exception as e:
         print(f"Error processing page: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             'page_num': page_num,
             'boxes': [],

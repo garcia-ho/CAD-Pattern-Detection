@@ -20,7 +20,8 @@ from string_detect import (
 from add_ocr_layer import add_ocr_to_pdfs
 
 def process_pdfs(input_paths=None, targets_path="String_match/target.txt", cores=8, 
-                dpi=400, sensitivity=10, skip_preprocess=False, skip_ocr=False):
+                dpi=400, sensitivity=10, skip_preprocess=False, skip_ocr=False,
+                use_paddleocr=True):
     """
     Process PDF files - preprocess, OCR, and highlight target strings
     Handles both single and multiple files with a unified approach
@@ -33,6 +34,7 @@ def process_pdfs(input_paths=None, targets_path="String_match/target.txt", cores
         sensitivity (int): Detection sensitivity
         skip_preprocess (bool): Whether to skip preprocessing
         skip_ocr (bool): Whether to skip OCR
+        use_paddleocr (bool): Whether to use PaddleOCR (better for technical drawings)
     """
     # Setup paths
     filtered_dir = "String_match/filtered_img"
@@ -60,6 +62,7 @@ def process_pdfs(input_paths=None, targets_path="String_match/target.txt", cores
     with open(log_path, 'a', encoding='utf-8') as log_file:
         log_file.write(f"Target strings: {', '.join(target_strings)}\n")
         log_file.write(f"Processing options: {cores} cores, {dpi} DPI, sensitivity {sensitivity}\n")
+        log_file.write(f"OCR Engine: {'PaddleOCR' if use_paddleocr else 'Tesseract'}\n")
         if skip_preprocess:
             log_file.write("Skipping preprocessing step\n")
         if skip_ocr:
@@ -162,7 +165,8 @@ def process_pdfs(input_paths=None, targets_path="String_match/target.txt", cores
         target_file=targets_path,
         max_workers=cores,
         dpi=dpi,
-        sensitivity=sensitivity
+        sensitivity=sensitivity,
+        use_paddleocr=use_paddleocr
     )
     
     # Restore stdout
@@ -225,12 +229,15 @@ def main():
                       help="Skip preprocessing step")
     parser.add_argument("--skip-ocr", action="store_true", 
                       help="Skip OCR processing (use this if PDFs already have OCR layer)")
+    parser.add_argument("--use-tesseract", action="store_true",
+                      help="Use Tesseract OCR instead of PaddleOCR (default: use PaddleOCR)")
 
     args = parser.parse_args()
     
     print("PDF Processing Pipeline: Preprocess, OCR, and Target String Detection")
     print("==================================================================")
     print(f"Using {args.cores} CPU cores, {args.dpi} DPI, sensitivity level {args.sensitivity}")
+    print(f"OCR Engine: {'Tesseract' if args.use_tesseract else 'PaddleOCR'}")
     
     # Process files (either specific files or all files)
     process_pdfs(
@@ -240,7 +247,8 @@ def main():
         dpi=args.dpi,
         sensitivity=args.sensitivity,
         skip_preprocess=args.skip_preprocess,
-        skip_ocr=args.skip_ocr
+        skip_ocr=args.skip_ocr,
+        use_paddleocr=not args.use_tesseract  # Default to PaddleOCR unless explicitly disabled
     )
 
 if __name__ == "__main__":
