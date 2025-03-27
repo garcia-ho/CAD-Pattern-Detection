@@ -119,6 +119,9 @@ python String_match/main_text_det.py
 <img src="readme_png/text_rec.png" width="500" alt="Pattern detection example">
 
 
+<img src="readme_png/highlighted_testB.png" width="500" alt="Pattern detection example">
+
+
 
 ## Output
 
