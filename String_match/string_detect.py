@@ -318,9 +318,9 @@ def is_duplicate_box(new_match, existing_matches, iou_threshold=0.5):
 
 
 def highlight_text_in_image(image, matches, color_map=None, line_thickness=2,
-                          show_confidence=True, font_scale=0.5):
+                          show_confidence=True, font_scale=0.5, alpha=0.3):
     """
-    Highlight detected text in the image
+    Highlight detected text in the image with colorful transparent boxes
     
     Args:
         image: Image to highlight text in
@@ -329,6 +329,7 @@ def highlight_text_in_image(image, matches, color_map=None, line_thickness=2,
         line_thickness: Thickness of bounding box lines
         show_confidence: Whether to show confidence scores
         font_scale: Scale factor for text
+        alpha: Transparency level for highlights (0.0-1.0)
         
     Returns:
         image: Image with highlighted text
@@ -355,7 +356,31 @@ def highlight_text_in_image(image, matches, color_map=None, line_thickness=2,
             # Convert box to numpy array with integer coordinates
             box_np = np.array([[int(p[0]), int(p[1])] for p in box], np.int32)
             
-            # Draw polygon around the text
+            # Create a mask for the polygon area
+            mask = np.zeros_like(result_img)
+            cv2.fillPoly(mask, [box_np], (255, 255, 255))
+            
+            # Create a colored overlay
+            overlay = np.zeros_like(result_img)
+            cv2.fillPoly(overlay, [box_np], color)
+            
+            # Apply the overlay with transparency
+            # Create a temporary copy of the part of the image under the mask
+            temp = cv2.bitwise_and(result_img, mask)
+            
+            # Blend the overlay with this part of the image
+            blended = cv2.addWeighted(overlay, alpha, temp, 1.0-alpha, 0)
+            
+            # Create inverted mask
+            mask_inv = cv2.bitwise_not(mask)
+            
+            # Keep the image outside the mask unchanged
+            result_img = cv2.bitwise_and(result_img, mask_inv)
+            
+            # Add the blended region back to the result
+            result_img = cv2.add(result_img, blended)
+            
+            # Draw solid border around the text
             cv2.polylines(result_img, [box_np], True, color, line_thickness)
             
             # Show confidence if requested
@@ -368,10 +393,19 @@ def highlight_text_in_image(image, matches, color_map=None, line_thickness=2,
                 if text_y < 10:
                     text_y = int(box_np[3][1] + 15)
                 
+                # Draw background for text for better readability
+                text = f"{target}: {confidence:.2f}"
+                (text_width, text_height), _ = cv2.getTextSize(
+                    text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)
+                cv2.rectangle(result_img, 
+                              (text_x, text_y - text_height - 2),
+                              (text_x + text_width, text_y + 2),
+                              (0, 0, 0), -1)
+                
                 # Draw confidence score
-                cv2.putText(result_img, f"{target}: {confidence:.2f}", 
+                cv2.putText(result_img, text, 
                           (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 
-                          font_scale, color, 2)
+                          font_scale, (255, 255, 255), 2)
         except Exception as e:
             print(f"Warning: Error highlighting text: {e}")
             continue

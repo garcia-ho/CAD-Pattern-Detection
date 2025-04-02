@@ -64,11 +64,11 @@ cd CAD_matching
 python Pattern_match/main.py --input-cad Pattern_match/input_CAD --processed-dir Pattern_match/input_image --output Pattern_match/output_CAD
 ```
 
-<img src="readme_png/Valve_det.png" width="500" alt="Pattern detection example">
+<img src="readme_png/Valve_det.png" width="800" alt="Pattern detection example">
 
-<img src="readme_png/example2.png" width="500" alt="Pattern detection example">
+<img src="readme_png/example2.png" width="800" alt="Pattern detection example">
 
-<img src="readme_png/example3.png" width="500" alt="Pattern detection example">
+<img src="readme_png/example3.png" width="800" alt="Pattern detection example">
 
 
 ### Command-Line Options
@@ -116,10 +116,10 @@ python String_match/main_text_det.py
 
 
 
-<img src="readme_png/text_rec.png" width="500" alt="Pattern detection example">
+<img src="readme_png/text_rec.png" width="800" alt="Pattern detection example">
 
 
-<img src="readme_png/highlighted_testB.png" width="500" alt="Pattern detection example">
+<img src="readme_png/highlighted_testB.png" width="800" alt="Pattern detection example">
 
 
 
@@ -130,3 +130,18 @@ python String_match/main_text_det.py
 - Text report summarizing detection statistics
 
 
+
+### Command-Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+|`--input-dir`|	Directory containing input PDFs	| `input_pdf`|
+|`--filtered-dir`|	Directory for filtered/preprocessed images|`	filtered_img`|
+|`--output-dir`|	Directory for highlighted output images	|`output`|
+|`--target-file`|	Path to file containing target words	|`target.txt`|
+|`--dpi`|	Resolution for PDF to image conversion	|`400`|
+|`--patch-size`|	Size of image patches for OCR	|`512`|
+|`--overlap`|	Percentage of overlap between patches	|`30`|
+|`--case-sensitive`|	Use case-sensitive matching	|`False`|
+|`--preprocess-only`|	Only run preprocessing step	|`False`|
+|`--ocr-only`|	Only run OCR detection step	|`False`|

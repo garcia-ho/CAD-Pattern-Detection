@@ -226,12 +226,14 @@ def binarize_image(image):
     return Image.fromarray(binary)
 
 
-def remove_lines(image):
+def remove_lines(image, min_line_length=50, line_thickness=2):
     """
-    Remove horizontal and vertical lines from an image
+    Remove long lines of any orientation from an image
     
     Args:
         image (PIL.Image): Input image
+        min_line_length (int): Minimum length of lines to remove
+        line_thickness (int): Thickness parameter for line detection
     
     Returns:
         PIL.Image: Image with lines removed
@@ -248,20 +250,43 @@ def remove_lines(image):
     # Create a binary image
     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
     
-    # Detect horizontal lines
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
-    horizontal_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+    # Remove standard horizontal and vertical lines first
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_line_length, 1))
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, min_line_length))
+    h_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+    v_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
     
-    # Detect vertical lines
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
-    vertical_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
+    # Use Hough Transform to detect lines of any orientation
+    edges = cv2.Canny(thresh, 50, 150, apertureSize=3)
+    lines = cv2.HoughLinesP(
+        edges, 
+        rho=1, 
+        theta=np.pi/180, 
+        threshold=100, 
+        minLineLength=min_line_length, 
+        maxLineGap=10
+    )
     
-    # Combine horizontal and vertical lines
-    lines = cv2.add(horizontal_lines, vertical_lines)
+    # Create a mask for all detected lines
+    lines_mask = np.zeros_like(gray)
+    
+    # Add standard horizontal and vertical lines to mask
+    lines_mask = cv2.add(lines_mask, h_lines)
+    lines_mask = cv2.add(lines_mask, v_lines)
+    
+    # Add lines detected by Hough transform to the mask
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(lines_mask, (x1, y1), (x2, y2), 255, line_thickness)
+    
+    # Dilate the line mask slightly to ensure complete removal
+    kernel = np.ones((3, 3), np.uint8)
+    lines_mask = cv2.dilate(lines_mask, kernel, iterations=1)
     
     # Remove lines from original image
     result = gray.copy()
-    result[lines > 0] = 255
+    result[lines_mask > 0] = 255
     
     # Return as PIL image
     return Image.fromarray(result)

@@ -168,9 +168,9 @@ def main():
                       help="Path to file containing target words")
     parser.add_argument("--dpi", type=int, default=400,
                       help="DPI for PDF to image conversion (default: 400)")
-    parser.add_argument("--patch-size", type=int, default=1024,
+    parser.add_argument("--patch-size", type=int, default=512,
                       help="Size of image patches (default: 1024)")
-    parser.add_argument("--overlap", type=int, default=15,
+    parser.add_argument("--overlap", type=int, default=30,
                       help="Percentage of overlap between patches (default: 15)")
     parser.add_argument("--case-sensitive", action="store_true",
                       help="Use case-sensitive matching")
